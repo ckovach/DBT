@@ -144,11 +144,13 @@ xdn = xdn(1:length(x));
 
 if makeplots
    dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
-   plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
+   pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
+   set(pl(1),'color','r');
+   set(pl(2),'color','b');
    xlabel('Freq (hz)')
    ylabel('dB');
    grid on
-   legend({'Power','Denoised power'})
+   legend({'Baseline normalized power','After denoising'})
    xlim([filter_above 800])
 end
 
