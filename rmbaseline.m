@@ -1,5 +1,5 @@
 
-function out = rmbaseline(bx,usepts)
+function [out,bl] = rmbaseline(bx,usepts)
 
 
 % Fits a polynomial to the spectrum and normalizes by the fitted value.
