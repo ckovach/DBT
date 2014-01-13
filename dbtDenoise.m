@@ -75,7 +75,7 @@ while i < length(varargin)
                   varargin(i:i+1) = []; 
                   i = i-1;                
               otherwise
-                 error('Unrecognized keyword %s',varargin{i})
+%                  error('Unrecognized keyword %s',varargin{i})
           end
           i = i+1;
 end
