@@ -26,7 +26,7 @@ classdef dbt
 % .  .  .	  X            X          X           . . . 
 % 	         / \	      / \        / \
 %            |-----------|           |-|
-%    	               BW              shoulder
+%    	          BW              shoulder
 %      
 % The taper is defined so that squares sum to 1
 

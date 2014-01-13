@@ -14,7 +14,7 @@ classdef stft
 %  B = stft(X,Fs,TW, ['option'], [value])
 %  Options:
 %
-%  	offset   -  offset of the first band from 0hz (default = 0)
+%  	    offset   -  offset of the first band from 0hz (default = 0)
 %       padding  - 'time': pad signal in the time domain, changing duration (default)
 %                  'frequency': pad in the frequency domain, changing sampling rate
 %       shoulder - (0 - 1) degree of overlap between neighboring bands (default = 0)           

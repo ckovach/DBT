@@ -1,7 +1,8 @@
 function [xdn,F,blsig] = dbtDenoise(x,fs,bandwidth,varargin)
 
 % Denoise using the demodulated band representation of a signal (see
-% DBT). A threshold is computed on the coefficients using a kur
+% DBT). A threshold is computed on the coefficients using a threshold on
+% kurtosis.
 %
 % Usage:
 %
@@ -19,6 +20,8 @@ function [xdn,F,blsig] = dbtDenoise(x,fs,bandwidth,varargin)
 %       xdn   - denoised signal
 %       filt  - filter used on DBT coefficients in denoising  
 %       blsig - DBT of xdn
+%
+% See also DBT
 
 % C Kovach 2013
 % ----------- SVN REVISION INFO ------------------
