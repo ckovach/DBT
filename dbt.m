@@ -225,7 +225,7 @@ classdef dbt
             end
             
             n = me.fullN;
-            noffset = me.offset./me.fullFS*n;            
+            noffset = round(me.offset./me.fullFS*n);            
             F = fft(me.blrep )*mult/sqrt(size(me.blrep,1)/2);          
             nsh = round(me.shoulder*me.bandwidth./me.fullFS*me.fullN);
             nnyq = size(F,1)/2;
