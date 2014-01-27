@@ -36,6 +36,8 @@ if nargin < 3 || isempty(bandwidth)
 end
 
 kurtosis_threshold = 10; % Apply a lower Z threshold to frequency points that have kurtosis above this value
+remove_spikes = false;  % Zero out time points that exceed some threshold
+spike_threshold = 6;
 filter_above = 40; 
 use_stft = false;
 zhithresh = 6;
@@ -62,6 +64,14 @@ while i < length(varargin)
                   filter_above = varargin{i+1};
                   varargin(i:i+1) = [];
                   i = i-1;
+               case {'remove spikes'}  % use stft instead of dbt
+                  
+                  remove_spikes = varargin{i+1};
+                  if ~islogical(remove_spikes) && remove_spikes~=1 && remove_spikes~=0
+                     spike_threshold = remove_spikes; 
+                  end
+                  varargin(i:i+1) = [];
+                  i = i-1;
                 case {'zhithresh','high threshold'}  % coefficient threshold
                   zthresh = varargin{i+1};
                   varargin(i:i+1) = [];
@@ -82,6 +92,19 @@ end
   
 
 shoulder  = 1; %This is overridden if passed as an argument in varargin
+
+if remove_spikes
+    
+    spks = false(size(x));
+    newspks = true;
+    while any(newspks)
+       z = (x-mean(x(~spks)))/std(x(~spks));
+       newspks = abs(z)>spike_threshold &~spks; 
+       spks = newspks | spks;
+    end
+    bspk = dbt(spks.*x,fs,bandwidth);
+    x = x.*~spks;
+end
 
 if ~use_stft
     blsig = dbt(x,fs,bandwidth,'padding','time','shoulder',shoulder,varargin{:}); % Band limited representation of the signal (see dbt)
