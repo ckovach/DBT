@@ -36,8 +36,9 @@ if nargin < 3 || isempty(bandwidth)
 end
 
 kurtosis_threshold = 10; % Apply a lower Z threshold to frequency points that have kurtosis above this value
-remove_spikes = false;  % Zero out time points that exceed some threshold
-spike_threshold = 6;
+spike.remove_spikes = false;  % Zero out time points that exceed some threshold
+spike.threshold = 6;
+spike.smoothwindow = .2;% Apply hanning window of given duration to smooth the spike filter.
 filter_above = 40; 
 use_stft = false;
 zhithresh = 6;
@@ -66,9 +67,9 @@ while i < length(varargin)
                   i = i-1;
                case {'remove spikes'}  % use stft instead of dbt
                   
-                  remove_spikes = varargin{i+1};
-                  if ~islogical(remove_spikes) && remove_spikes~=1 && remove_spikes~=0
-                     spike_threshold = remove_spikes; 
+                  spike.remove_spikes = varargin{i+1};
+                  if ~islogical(spike.remove_spikes) && spike.remove_spikes~=1 && spike.remove_spikes~=0
+                     spike.threshold = spike.remove_spikes; 
                   end
                   varargin(i:i+1) = [];
                   i = i-1;
@@ -93,17 +94,19 @@ end
 
 shoulder  = 1; %This is overridden if passed as an argument in varargin
 
-if remove_spikes
+if spike.remove_spikes
     
     spks = false(size(x));
     newspks = true;
     while any(newspks)
        z = (x-mean(x(~spks)))/std(x(~spks));
-       newspks = abs(z)>spike_threshold &~spks; 
+       newspks = abs(z)>spike.threshold &~spks; 
        spks = newspks | spks;
     end
-    bspk = dbt(spks.*x,fs,bandwidth);
-    x = x.*~spks;
+    win = hanning(ceil(spike.smoothwindow.*fs));
+    spike.filter = exp(convn(log(1-spks+eps),win,'same'));
+    spike.filter(spike.filter<0)=0;
+    x = x.*spike.filter;
 end
 
 if ~use_stft
