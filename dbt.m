@@ -53,7 +53,7 @@ classdef dbt
         fullFS = 0;   %%% Sampling frequency of the reconstructed signal
         Norig = 0;    %%% Original signal length before padding
         nyqval = 0;   %%% fft value at the nyquist frequency
-        shoulder = 0; %%% Degree of frequency overlap between neighboring bands (0 - 1)
+        shoulder = 1; %%% Degree of frequency overlap between neighboring bands (0 - 1)
         lowpass = []; %%% Lowpass cutoff
 %        taperfun =[];
         taper = [];
@@ -230,14 +230,15 @@ classdef dbt
             nsh = round(me.shoulder*me.bandwidth./me.fullFS*me.fullN);
             nnyq = size(F,1)/2;
             
-            % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
-            tp = me.taper.make((1:1:nsh)/nsh); 
-            invtaper = me.taper.make(1-(1:1:nsh)/nsh);
-            
-            sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1);
-            F(1:nsh,2:end) = diag(sparse(invtaper))*F(1:nsh,2:end)+sh;
-            F(nnyq-nsh+1:end,:) = [];
+            if nsh >0
+                % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
+                tp = me.taper.make((1:1:nsh)/nsh); 
+                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
 
+                sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1);
+                F(1:nsh,2:end) = diag(sparse(invtaper))*F(1:nsh,2:end)+sh;
+                F(nnyq-nsh+1:end,:) = [];
+            end
             Ffull(noffset+(1:numel(F))) = F(:)*sqrt(me.fullN);
             Ffull(me.fullN) = 0;
             

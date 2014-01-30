@@ -6,13 +6,13 @@ function [xdn,F,blsig] = dbtDenoise(x,fs,bandwidth,varargin)
 %
 % Usage:
 %
-%   [xdn,filt,dbt] = dbtDenoise(x,Fs,bandwidth)
+%   [xdn,filt,dbt] = dbtDenoise(x,Fs,bandwidth,[keyword],[value])
 %
 %    Inputs:
 % 
 %       x - signal
 %       Fs - sampling frequency
-%       bandwidth to use 
+%       bandwidth to use in the dbt (default = 0.05)
 %
 % 
 %    Outputs:
@@ -21,6 +21,27 @@ function [xdn,F,blsig] = dbtDenoise(x,fs,bandwidth,varargin)
 %       filt  - filter used on DBT coefficients in denoising  
 %       blsig - DBT of xdn
 %
+%    Keyword options:
+%       
+%       'remove spikes':  true - remove spikes at the default threshold (default)
+%                                before applying dbt-based denoising.
+%                         false - no spike removal
+%                         n (scalar) - remove spikes at specified threshold
+%                         Thresholding is applled iteratively to z-scores
+%                         across all remaining time points none remain above the threshold.
+%
+%       'kthresh'      :  kurtosis threshold. Coefficients in frequency bands for which
+%                         kurtosis over time falls above this value are
+%                         thresholded at 'zlothreshold' and otherwise at
+%                         'zhireshold'. This feature was added as
+%                         kurtosis is useful for detecting frequency
+%                         modulated line noise. Default = 10.
+%                         
+%      'zhithresh'     : Threshold for coefficient removal. (default=6)
+%       
+%      'zlothresh'     : Threshold for coefficient removal in frequency
+%                        banbds that fall above 'kthresh'. (default = 3).
+%       
 % See also DBT
 
 % C Kovach 2013
@@ -36,8 +57,13 @@ if nargin < 3 || isempty(bandwidth)
 end
 
 kurtosis_threshold = 10; % Apply a lower Z threshold to frequency points that have kurtosis above this value
-spike.remove_spikes = false;  % Zero out time points that exceed some threshold
-spike.threshold = 6;
+spike.remove_spikes = true;  % Zero out time points that exceed some threshold
+spike.threshold = 10; % This is the threshold used in detecting spikes. 
+                      % Z-score is computed iteratively until
+                      % no points exceed this value. The threshold is set
+                      % high by default because the main purpose here is to avoid
+                      % distortion of kurtosis used in the
+                      % kurtosis-threshold.
 spike.smoothwindow = .2;% Apply hanning window of given duration to smooth the spike filter.
 filter_above = 40; 
 use_stft = false;
@@ -81,7 +107,7 @@ while i < length(varargin)
                   zthresh = varargin{i+1};
                   varargin(i:i+1) = [];
                   i = i-1;        
-                case {'makeplots'}  % Apply a lower threshold to frequencies above the kurtosis threshold
+                case {'makeplots'} 
                   makeplots = varargin{i+1};
                   varargin(i:i+1) = []; 
                   i = i-1;                
