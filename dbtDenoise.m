@@ -120,19 +120,19 @@ end
 
 shoulder  = 1; %This is overridden if passed as an argument in varargin
 
-if spike.remove_spikes
-    
-    spks = false(size(x));
-    newspks = true;
-    while any(newspks)
-       z = (x-mean(x(~spks)))/std(x(~spks));
-       newspks = abs(z)>spike.threshold &~spks; 
-       spks = newspks | spks;
-    end
-    win = hanning(ceil(spike.smoothwindow.*fs));
-    spike.filter = exp(convn(log(1-spks+eps),win,'same'));
-    spike.filter(spike.filter<0)=0;
-    x = x.*spike.filter;
+if spike.remove_spikes    
+    [x,spike] = spikefilter(x,fs,spike);
+%     spks = false(size(x));
+%     newspks = true;
+%     while any(newspks)
+%        z = (x-mean(x(~spks)))/std(x(~spks));
+%        newspks = abs(z)>spike.threshold &~spks; 
+%        spks = newspks | spks;
+%     end
+%     win = hanning(ceil(spike.smoothwindow.*fs));
+%     spike.filter = exp(convn(log(1-spks+eps),win,'same'));
+%     spike.filter(spike.filter<0)=0;
+%     x = x.*spike.filter;
 end
 
 if ~use_stft
