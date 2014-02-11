@@ -29,7 +29,7 @@ classdef dbt
 %            |-----------|           |-|
 %    	          BW              shoulder
 %      
-% The taper is defined so that squares sum to 1
+% By default,  the taper is defined so that squares sum to 1
 
 
 %     C Kovach 2013
