@@ -18,7 +18,7 @@ if nargin < 2 || isempty(usepts)
 end
 polyord = 8;
 
-mn = mean(abs(bx.blrep));
+mn = mean(abs(bx.blrep),1);
 kp = find(mn~=0 & usepts);
 p = polyfit(kp./length(mn),log(mn(kp)),polyord);
 

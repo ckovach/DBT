@@ -4,7 +4,7 @@ classdef taper
     %
     %Properties:
     %
-    % generator:  Handle defining A function, h, used to generate the taper.
+    % generator:  Handle defining a function, h, used to generate the taper.
     %             h is defined over [0 1] and typically has h(0) = 1 and h(1) = 0. 
     %             Default is @(x)1/2*(1+cos(x*pi)). This is not the same as
     %             the taper function,
