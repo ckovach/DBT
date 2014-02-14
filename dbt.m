@@ -58,6 +58,7 @@ classdef dbt
         lowpass = []; %%% Lowpass cutoff
 %        taperfun =[];
         taper = [];
+        padding = 'time';
 %         taper = 'quadratic'; 
     end
     
@@ -84,7 +85,7 @@ classdef dbt
                       me.lowpass = band(end);                      
                       i = i+1;
                   case 'padding'
-                      padding = varargin{i+1};
+                      me.padding = varargin{i+1};
                       i = i+1;
                   case 'shoulder'
                       me.shoulder = varargin{i+1};
@@ -123,13 +124,14 @@ classdef dbt
            T = n./fs; % signal duration
            %%% K and M need to be integers
            
-           K = ceil(1/2*n./(T*bw) - 1/2*me.offset/bw); 
            M = ceil(bw*T);
+%            K = ceil(1/2*n./(T*bw) - 1/2*me.offset/bw); 
+           K = ceil(1/2*n./M - 1/2*me.offset/bw); 
            newnf = 2*K*M;
            newn = 2*ceil(newnf/2 + me.offset*newnf/(fs-2*me.offset));
            noffset = (newn-newnf)/2;
             
-           switch padding
+           switch me.padding
                case 'time'
                   T = newn./fs;
                  fullsig(newn) = 0; 
@@ -160,7 +162,10 @@ classdef dbt
            
         
            F = fft(fullsig./sqrt(length(fullsig)));
-           F(1) = F(1) + 1i*F(newn/2+1);
+           
+           if strcmp(me.padding,'time')
+               F(1) = F(1) + 1i*F(newn/2+1);
+           end
            
            newF = zeros(newn,1);           
            oldn = floor(nyq./fs*n)+1;
@@ -240,12 +245,27 @@ classdef dbt
                 F(1:nsh,2:end) = diag(sparse(invtaper))*F(1:nsh,2:end)+sh;
                 F(nnyq-nsh+1:end,:) = [];
             end
-            Ffull(noffset+(1:numel(F))) = F(:)*sqrt(me.fullN);
-            Ffull(me.fullN) = 0;
-            
-            Ffull(me.fullN/2+1) = imag(Ffull(1))/2;
-            Ffull(1) = real(Ffull(1))/2;
-            
+           
+            switch me.padding
+                case 'frequency'
+                   Ffull(noffset+(1:numel(F))) = F(:)*sqrt(me.Norig);
+                   Ffull(me.Norig+1:end) = []; 
+                   Ffull(floor(me.Norig/2+.5)+1) = Ffull(floor(me.Norig/2+.5)+1)/2; 
+                   Ffull(ceil(me.Norig/2+.5)+1:me.Norig) = 0; 
+        
+                    Ffull(1) = real(Ffull(1))/2;
+                   
+%                     Ffull(ceil(me.Norig/2)+1) = imag(Ffull(1))/2;
+%                     Ffull(1) = real(Ffull(1))/2;
+                 case 'time'
+                    Ffull(noffset+(1:numel(F))) = F(:)*sqrt(me.fullN);
+                    
+                    Ffull(me.fullN/2+1) = imag(Ffull(1))/2;
+                    Ffull(1) = real(Ffull(1))/2;
+                    Ffull(me.fullN) = 0;
+
+            end
+                
             if hilbert
                 data = ifft(Ffull);
             else
