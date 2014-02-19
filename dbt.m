@@ -67,7 +67,7 @@ classdef dbt
     
         function me = dbt(varargin)
             
-            padding = 'time';
+%             padding = 'time';
             i = 4;       
 %             me.taperfun = @(x)x;
 %            me.taperfun = @(x)(1-cos(x*pi))/2; % Function that defines tapering in the overlapping regions of the window
@@ -115,7 +115,9 @@ classdef dbt
            fullsig  = varargin{1};
            nyq = bandwindows(end)+bw;
            
-           n = length(fullsig);
+           n = size(fullsig,1);
+           ncol = size(fullsig,2);
+           
            me.Norig = n;
            %Resample signal so that everything factors
            %Keeping signal duration fixed and allowing bandwidth and sampling
@@ -161,18 +163,18 @@ classdef dbt
            me.offset = noffset*newfs/newn;
            
         
-           F = fft(fullsig./sqrt(length(fullsig)));
+           F = fft(fullsig./sqrt(n));
            
            if strcmp(me.padding,'time')
-               F(1) = F(1) + 1i*F(newn/2+1);
+               F(1,:) = F(1,:) + 1i*F(newn/2+1,:);
            end
            
-           newF = zeros(newn,1);           
+           newF = zeros(newn,ncol);           
            oldn = floor(nyq./fs*n)+1;
-           newF(1:oldn) = F(1:oldn);
+           newF(1:oldn,:) = F(1:oldn,:);
            
            if me.shoulder == 0
-               Frs = reshape(newF(noffset+1:newn/2),winN,nwin);
+               Frs = reshape(newF(noffset+1:newn/2,:),winN,nwin,ncol);
            else
               
                nsh = ceil(me.shoulder*newbw./newfs*newn);
@@ -180,20 +182,24 @@ classdef dbt
                rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);
                tp = me.taper.make((1:1:nsh)/nsh); 
                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
+               Frs = zeros([size(rsmat),ncol]);
                
-               Frs = double(F(rsmat));
-               
-               %%% Now add the taper
-%                Frs(end+(1-nsh:0),1:nwin-1) = diag(sparse(taper))*Frs(end+(1-nsh:0),1:nwin-1);
-               Frs(end+(1-nsh:0),1:nwin-1) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin-1);
-               
-               %%% subptract the tapered component from the next band
-               Frs(1:nsh,2:nwin) = diag(sparse(invtaper))*Frs(1:nsh,2:nwin); % - Frs(end+(1-nsh:0),1:nwin-1);
-               winN = size(Frs,1);
+               for  k = 1:ncol
+                    f = F(:,k);
+                   Frs(:,:,k) = double(f(rsmat));
+                    
+                   %%% Now add the taper
+    %                Frs(end+(1-nsh:0),1:nwin-1) = diag(sparse(taper))*Frs(end+(1-nsh:0),1:nwin-1);
+                   Frs(end+(1-nsh:0),1:nwin-1,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin-1,k);
+
+                   %%% subptract the tapered component from the next band
+                   Frs(1:nsh,2:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,2:nwin,k); % - Frs(end+(1-nsh:0),1:nwin-1);
+                   winN = size(Frs,1);
+               end
            end
-           me.nyqval = newF(newn/2+1);
+           me.nyqval = newF(newn/2+1,:);
            
-           Frs(winN*2,:) = 0;
+           Frs(winN*2,:,:) = 0;
            me.blrep = ifft(2*Frs)*sqrt(winN);
            
            me.sampling_rate = 2*winN/T;
@@ -201,7 +207,7 @@ classdef dbt
                               
            me.bandwidth = newbw;
            me.bands = [me.offset:newbw:me.lowpass-newbw;(me.offset+newbw:newbw:me.lowpass)]';
-           me.time = ((1:size(me.blrep,1))-.5)*T./size(me.blrep,1);
+           me.time = ((1:size(me.blrep,1))-1)*T./size(me.blrep,1);
            w = ((0:K-1)+.5)*newbw + me.offset;          
            me.blrep(:,w>me.lowpass) = [];
            w(w>me.lowpass) = [];
@@ -235,47 +241,53 @@ classdef dbt
             F = fft(me.blrep )*mult/sqrt(size(me.blrep,1)/2);          
             nsh = round(me.shoulder*me.bandwidth./me.fullFS*me.fullN);
             nnyq = size(F,1)/2;
-            
+            ncol = size(F,3);
             if nsh >0
                 % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
                 tp = me.taper.make((1:1:nsh)/nsh); 
                 invtaper = me.taper.make(1-(1:1:nsh)/nsh);
-
-                sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1);
-                F(1:nsh,2:end) = diag(sparse(invtaper))*F(1:nsh,2:end)+sh;
-                F(nnyq-nsh+1:end,:) = [];
+                for k = 1:ncol
+                    sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
+                    F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
+                end
+                    F(nnyq-nsh+1:end,:,:) = [];
             end
-           
+            Ffull = zeros(me.fullN,ncol);
             switch me.padding
                 case 'frequency'
-                   Ffull(noffset+(1:numel(F))) = F(:)*sqrt(me.Norig);
-                   Ffull(me.Norig+1:end) = []; 
-                   Ffull(floor(me.Norig/2+.5)+1) = Ffull(floor(me.Norig/2+.5)+1)/2; 
-                   Ffull(ceil(me.Norig/2+.5)+1:me.Norig) = 0; 
-        
-                    Ffull(1) = real(Ffull(1))/2;
-                   
+                    for k = 1:ncol
+                      f = F(:,:,k);
+
+                       Ffull(noffset+(1:numel(f)),k) = f(:)*sqrt(me.Norig);
+                       Ffull(floor(me.Norig/2+.5)+1,k) = Ffull(floor(me.Norig/2+.5)+1,k)/2; 
+                       Ffull(ceil(me.Norig/2+.5)+1:me.Norig,k) = 0; 
+
+                        Ffull(1,k) = real(Ffull(1,k))/2;
+                    end
+                    Ffull(me.Norig+1:end,k) = []; 
+
 %                     Ffull(ceil(me.Norig/2)+1) = imag(Ffull(1))/2;
 %                     Ffull(1) = real(Ffull(1))/2;
                  case 'time'
-                    Ffull(noffset+(1:numel(F))) = F(:)*sqrt(me.fullN);
-                    
-                    Ffull(me.fullN/2+1) = imag(Ffull(1))/2;
-                    Ffull(1) = real(Ffull(1))/2;
-                    Ffull(me.fullN) = 0;
+                    for k = 1:ncol
+                        f = F(:,:,k);
+                        Ffull(noffset+(1:numel(f)),k) = f(:)*sqrt(me.fullN);
 
+                        Ffull(me.fullN/2+1,k) = imag(Ffull(1,k))/2;
+                        Ffull(1,k) = real(Ffull(1,k))/2;
+%                         Ffull(me.fullN,k) = 0;
+                    end
             end
-                
+
             if hilbert
-                data = ifft(Ffull);
+                data = ifft(full(Ffull));
             else
-                data = real(ifft(Ffull));
+                data = real(ifft(full(Ffull)));
             end
-            data = data(1:me.Norig);
+            data = data(1:me.Norig,:);
             fs = me.fullFS;
             
-        end
-        
+       end
        
     end
 end
