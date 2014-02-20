@@ -180,24 +180,28 @@ classdef dbt
                nsh = ceil(me.shoulder*newbw./newfs*newn);
                me.shoulder = nsh*newfs./newn./newbw;
                rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);
+               rsmat = cat(2,rsmat(:,1),rsmat,rsmat(:,end));
                tp = me.taper.make((1:1:nsh)/nsh); 
                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
                Frs = zeros([size(rsmat),ncol]);
-               
                for  k = 1:ncol
                     f = F(:,k);
                    Frs(:,:,k) = double(f(rsmat));
-                    
+                   Frs(nsh+1:end,[1 end],k) = 0;
+                   Frs(1:nsh,1,k) = diag(sparse(tp))*Frs(1:nsh,1,k);
+                   Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(1:nsh,end,k);
+                   
                    %%% Now add the taper
     %                Frs(end+(1-nsh:0),1:nwin-1) = diag(sparse(taper))*Frs(end+(1-nsh:0),1:nwin-1);
-                   Frs(end+(1-nsh:0),1:nwin-1,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin-1,k);
+                   Frs(end+(1-nsh:0),1:nwin+1,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin+1,k);
 
                    %%% subptract the tapered component from the next band
-                   Frs(1:nsh,2:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,2:nwin,k); % - Frs(end+(1-nsh:0),1:nwin-1);
+                   Frs(1:nsh,2:nwin+2,k) = diag(sparse(invtaper))*Frs(1:nsh,2:nwin+2,k); % - Frs(end+(1-nsh:0),1:nwin-1);
                    winN = size(Frs,1);
                end
            end
-           me.nyqval = newF(newn/2+1,:);
+      
+%            me.nyqval = newF(newn/2+1,:);
            
            Frs(winN*2,:,:) = 0;
            me.blrep = ifft(2*Frs)*sqrt(winN);
@@ -206,10 +210,15 @@ classdef dbt
            
                               
            me.bandwidth = newbw;
-           me.bands = [me.offset:newbw:me.lowpass-newbw;(me.offset+newbw:newbw:me.lowpass)]';
+           me.bands = [me.offset,me.offset + me.shoulder/2*newbw:newbw:me.lowpass-newbw,me.lowpass-newbw+ me.shoulder/2*newbw;...
+                       me.offset+me.shoulder/2*newbw,me.offset+ (1+me.shoulder/2)*newbw:newbw:me.lowpass+ (me.shoulder/2-1)*newbw,me.lowpass]';
+%            me.bands(1,1) = me.offset;
+%            me.bands(end,2) = me.lowpass;
            me.time = ((1:size(me.blrep,1))-1)*T./size(me.blrep,1);
-           w = ((0:K-1)+.5)*newbw + me.offset;          
-           me.blrep(:,w>me.lowpass) = [];
+%            w = ((0:K-2)+.5 + me.shoulder/2)*newbw + me.offset; 
+%            w = [me.shoulder/2*newbw, w, me.lowpass-me.shoulder/2*newbw];
+           w = mean(me.bands,2);
+           me.blrep(:,w>me.lowpass,:) = [];
            w(w>me.lowpass) = [];
            me.frequency = w;
            
@@ -248,9 +257,12 @@ classdef dbt
                 invtaper = me.taper.make(1-(1:1:nsh)/nsh);
                 for k = 1:ncol
                     sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
+                    sh(:,1) = diag(sparse(tp))*F(1:nnyq-nsh,1);
+                    
                     F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
                 end
                     F(nnyq-nsh+1:end,:,:) = [];
+                    F(:,[1 end],:) = [];
             end
             Ffull = zeros(me.fullN,ncol);
             switch me.padding
