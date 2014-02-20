@@ -211,7 +211,7 @@ classdef dbt
            
                               
            me.bandwidth = newbw;
-           if me.shoulder ~-0
+           if me.shoulder ~=0
                me.bands = [me.offset,me.offset + me.shoulder/2*newbw:newbw:me.lowpass-newbw,me.lowpass- me.shoulder/2*newbw;...
                            me.offset+me.shoulder/2*newbw,me.offset+ (1+me.shoulder/2)*newbw:newbw:me.lowpass - me.shoulder/2*newbw,me.lowpass]';
            else
