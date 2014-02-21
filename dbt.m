@@ -156,7 +156,7 @@ classdef dbt
               me.lowpass = newfs/2; 
            end
            
-           nwin = K+2;
+%            nwin = K+2;
            winN = M;
          
 %            noffset = floor(me.offset*newn/newfs);
@@ -165,16 +165,27 @@ classdef dbt
         
            F = fft(fullsig./sqrt(n));
            
-           if strcmp(me.padding,'time')
-               F(1,:) = F(1,:) + 1i*F(newn/2+1,:);
+%            if strcmp(me.padding,'time')
+%                F(1,:) = F(1,:) + 1i*F(newn/2+1,:);
+%            end
+             me.bandwidth = newbw;
+           if me.shoulder ~=0
+               me.bands(:,1) = [me.offset,me.offset + me.shoulder/2*newbw:newbw:me.lowpass-newbw,me.lowpass- me.shoulder/2*newbw];
+               me.bands(2:end-1,2) = me.bands(2:end-1,1)+bw;
+               me.bands([1 end],2) = me.bands([1 end],1)+bw*me.shoulder/2;
+           else
+               me.bands = [me.offset :newbw:me.lowpass-newbw;...
+                           (me.offset + newbw) :newbw:me.lowpass ]';
+               
            end
-           
+           nwin =size(me.bands,1);
            newF = zeros(newn,ncol);           
            oldn = floor(nyq./fs*n)+1;
            newF(1:oldn,:) = F(1:oldn,:);
            
            if me.shoulder == 0
-               nwin = nwin-2;
+%                nwin = nwin-2;
+                nwin = K;
                Frs = reshape(newF(noffset+1:newn/2,:),winN,nwin,ncol);
            else
               
@@ -210,21 +221,13 @@ classdef dbt
            me.sampling_rate = 2*winN/T;
            
                               
-           me.bandwidth = newbw;
-           if me.shoulder ~=0
-               me.bands = [me.offset,me.offset + me.shoulder/2*newbw:newbw:me.lowpass-newbw,me.lowpass- me.shoulder/2*newbw;...
-                           me.offset+me.shoulder/2*newbw,me.offset+ (1+me.shoulder/2)*newbw:newbw:me.lowpass - me.shoulder/2*newbw,me.lowpass]';
-           else
-               me.bands = [me.offset + me.shoulder/2*newbw:newbw:me.lowpass-newbw,me.lowpass- me.shoulder/2*newbw;...
-                           me.offset+me.shoulder/2*newbw,me.offset+ (1+me.shoulder/2)*newbw:newbw:me.lowpass - me.shoulder/2*newbw]';
-               
-           end
+         
 %            me.bands(1,1) = me.offset;
 %            me.bands(end,2) = me.lowpass;
-           me.time = ((1:size(me.blrep,1))-1)*T./size(me.blrep,1);
+           me.time = (((1:size(me.blrep,1))-1)*T./size(me.blrep,1))';
 %            w = ((0:K-2)+.5 + me.shoulder/2)*newbw + me.offset; 
 %            w = [me.shoulder/2*newbw, w, me.lowpass-me.shoulder/2*newbw];
-           w = mean(me.bands,2);
+           w = mean(me.bands,2)';
            me.blrep(:,w>me.lowpass,:) = [];
            w(w>me.lowpass) = [];
            me.frequency = w;
@@ -283,7 +286,7 @@ classdef dbt
 
                         Ffull(1,k) = real(Ffull(1,k))/2;
                     end
-                    Ffull(me.Norig+1:end,k) = []; 
+                    Ffull(me.Norig+1:end,:) = []; 
 
 %                     Ffull(ceil(me.Norig/2)+1) = imag(Ffull(1))/2;
 %                     Ffull(1) = real(Ffull(1))/2;
