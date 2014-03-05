@@ -21,6 +21,7 @@ phasefs=fs;
 coherence = false; % compute coherence instead of PAC if true
 smwin = 0;
 anglehist = false;
+partial =  false;
 i = 1;
 while i < length(varargin)
     
@@ -48,6 +49,9 @@ while i < length(varargin)
        case 'smwin'
            smwin= varargin{i+1};
            i = i+1;
+         case 'partial'
+           partial= varargin{i+1};
+           i = i+1;
        otherwise
            error('Unrecognized keyword %i',varargin{i+1})
    end
@@ -56,7 +60,8 @@ end
 
 
     
-fprintf('\n%4i',0)
+ampargs = {fs,ampbw,'padding','frequency','lowpass',amprange(2),'offset',amprange(1)};
+fprintf('\nAmplitude: %4i',0)
 % fprintf('\nAmplitude %4i',0)
 for i = 1:size(Y,2)
     fprintf('\b\b\b\b%4i',i)
@@ -80,12 +85,13 @@ ampt = (0:size(amp,1)-1)./ampfs;
 %         fprintf('\b\b\b\b\b\b\b\b\b\b\b')
 %         fprintf('%0.4i<->%0.4i',i,k)
 
-%     fprintf('%4i',0)
+    fprintf('\nPhase: %4i',0)
+phargs = {phasefs,phasebw,'padding','frequency','lowpass',phaserange(2),'offset',phaserange(1)};
 for k = 1:size(X,2);        
        fprintf('\b\b\b\b%4i',k)
 
         x = X(:,k);
-        dbph = dbt(x,phasefs,phasebw,'padding','frequency','lowpass',phaserange(2),'offset',phaserange(1));
+        dbph = dbt(x,phargs{:});
 
 
         %Interpolate to amplitude sampling rate with sinc interpolation (i.e. padding the fft).
@@ -125,13 +131,22 @@ remodulator = repmat(permute(exp(2*pi*1i*rmf*ampt)',[1 3 2]), [1 nx  1  ]);
 %%% remodulate phase and reshape matrices
 rmph = iph.*conj(remodulator);
 % amp = zscore(amp);
-
 for i = 1:nampbands
     fprintf('%4i',0)
     
     for k = 1:nphbands
 %         fprintf('%4i',k)
-        PAC(:,:,i,k) = corr(amp(:,:,i),rmph(:,:,k));
+        if partial
+            a = amp(:,:,i);
+%             p = rmph(:,:,k);
+            b =sum(a.*conj(rmph(:,:,k)))./sum(abs(rmph(:,:,k)).^2);
+            
+            a = a-rmph(:,:,k).*repmat(b,size(a,1),1);
+        else
+            a = amp(:,:,i);
+        end
+            
+        PAC(:,:,i,k) = corr(a,rmph(:,:,k));
 
         if i==1 && ny > 1
             PAC(:,:,nampbands,nphbands)= 0;
@@ -193,6 +208,8 @@ xypac.ampfreq = dbamp.frequency';
 xypac.phfreq = dbph.frequency;
 xypac.fs = fs;
 xypac.cmtime= cmtime;
-xypac.args = varargin;
+xypac.args.in = varargin;
+xypac.args.dbamp = ampargs;
+xypac.args.dbphase = phargs;
 
 
