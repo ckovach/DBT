@@ -22,6 +22,7 @@ coherence = false; % compute coherence instead of PAC if true
 smwin = 0;
 anglehist = false;
 partial =  false;
+exclude_time = false;
 i = 1;
 while i < length(varargin)
     
@@ -51,6 +52,9 @@ while i < length(varargin)
            i = i+1;
          case 'partial'
            partial= varargin{i+1};
+           i = i+1;
+         case 'exclude time'
+           exclude_time= varargin{i+1};
            i = i+1;
        otherwise
            error('Unrecognized keyword %i',varargin{i+1})
@@ -128,6 +132,12 @@ end
 rmf = dbph.bands(:,1)-dbph.shoulder/2*dbph.bandwidth;
 remodulator = repmat(permute(exp(2*pi*1i*rmf*ampt)',[1 3 2]), [1 nx  1  ]);
 
+if ~isscalar(exclude_time)
+   ext = (0:length(exclude_time))/fs;
+   gett = interp1(ext,double(exclude_time),ampt,'nearest')>0;
+else
+    gett = true(size(ampt));
+end
 %%% remodulate phase and reshape matrices
 rmph = iph.*conj(remodulator);
 % amp = zscore(amp);
@@ -146,7 +156,7 @@ for i = 1:nampbands
             a = amp(:,:,i);
         end
             
-        PAC(:,:,i,k) = corr(a,rmph(:,:,k));
+        PAC(:,:,i,k) = corr(a(gett,:,:),rmph(gett,:,k));
 
         if i==1 && ny > 1
             PAC(:,:,nampbands,nphbands)= 0;
