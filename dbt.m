@@ -233,8 +233,11 @@ classdef dbt
                me.blrep = ifft(2*Frs)*sqrt(winN);
            end
            
-           me.sampling_rate = 2*winN/T;
-           
+           if me.centerDC
+               me.sampling_rate = winN/T;
+           else
+               me.sampling_rate = 2*winN/T;
+           end       
                               
          
 %            me.bands(1,1) = me.offset;

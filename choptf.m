@@ -16,6 +16,7 @@ function [CH,tt] = choptf(trg,times,db,trref)
 
 if nargin < 4
     trref = [];
+    nrm = 1;
 end
 
 [T,tt]= chopper(trg,times,db.sampling_rate);
@@ -28,16 +29,18 @@ if ~isempty(trref)
 
 end
 x = ones(length(db.time)+1,1);
-CH = zeros([length(tt),length(db.frequency),size(T,2)]);
-for k = 1:length(db.frequency)
-    
-    x(1:length(db.time)) = db.blrep(:,k);
-    
-    if ~isempty(trref)
-        %%% normalizing by mean envelope
-        nrm = repmat(mean(abs(x(Tref))),length(tt),1);
+nch = size(db.blrep,3);
+CH = zeros([length(tt),length(db.frequency),size(T,2), nch]);
+for i = 1:nch
+    for k = 1:length(db.frequency)
+
+        x(1:length(db.time)) = db.blrep(:,k,i);
+
+        if ~isempty(trref)
+            %%% normalizing by mean envelope
+            nrm = repmat(mean(abs(x(Tref))),length(tt),1);
+        end
+        CH(:,k,:,i) = x(T)./nrm;
     end
-    CH(:,k,:) = x(T)./nrm;
-            
 
 end
