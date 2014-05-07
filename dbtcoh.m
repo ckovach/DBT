@@ -10,12 +10,24 @@ function [coh,csp,w,dbs,trf] =dbtcoh(x,y,varargin)
 % $Author$
 % ------------------------------------------------
 
+
+nx = size(x,2);    
+
+if isscalar(y)
+    varargin = [{y},varargin];
+    y=[];
+    ny = nx;
+elseif ~isempty(y) 
+    dby = dbt(y,varargin{:});
+    ny = size(y,2);
+else
+    ny = nx;
+end
+
 dbx = dbt(x,varargin{:});
 
-dby = dbt(y,varargin{:});
-
 w = dbx.frequency;
-csp = zeros(size(x,2),size(y,2),length(w));
+csp = zeros(nx,ny,length(w));
 coh = csp;
 if nargout > 4
     trf = csp;
@@ -23,10 +35,18 @@ end
 for i = 1:length(dbx.frequency)
         
         blx = squeeze(dbx.blrep(:,i,:));
-        bly = squeeze(dby.blrep(:,i,:));
-        
+        if isempty(y)
+            bly = blx;
+        else
+            bly = squeeze(dby.blrep(:,i,:));
+        end
         csp(:,:,i) = blx'*bly;
-        coh(:,:,i) = diag(diag(csp(:,:,i).^-.5))*csp(:,:,i)*diag(diag(csp(:,:,i)).^-.5);
+        if isempty(y)
+             coh(:,:,i) = diag(diag(csp(:,:,i).^-.5))*csp(:,:,i)*diag(diag(csp(:,:,i)).^-.5);
+        else          
+           coh(:,:,i) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i)*diag(sum(abs(bly).^2).^-.5);
+        end
+        
     if nargout > 4
            trf(:,:,i) = diag(sum(abs(blx).^2))\(blx'*bly);
           

@@ -59,6 +59,14 @@ classdef dbt
 %        taperfun =[];
         taper = [];
         padding = 'time';
+        centerDC = true; %%% If false (default), the pass band is demodulated 
+                          %%% so that 0 is the highpass limit, meaning that negative 
+                          %%% frequencies contain zero padding.
+                          %%% If true, the pass band is centered at 0, so
+                          %%% that the signal contains negative
+                          %%% frequencies, which halves the number of
+                          %%% samples.
+                          
 %         taper = 'quadratic'; 
     end
     
@@ -95,6 +103,9 @@ classdef dbt
                       i = i+1;
                  case 'taper'
                       me.taper = varargin{i+1};
+                      i = i+1;
+                 case 'centerdc'
+                      me.centerDC = varargin{i+1};
                       i = i+1;
                   otherwise
                      error('Unrecognized keyword %s',varargin{i})
@@ -214,9 +225,13 @@ classdef dbt
            end
       
 %            me.nyqval = newF(newn/2+1,:);
-           
-           Frs(winN*2,:,:) = 0;
-           me.blrep = ifft(2*Frs)*sqrt(winN);
+           if me.centerDC
+               Frs = fftshift(Frs,1);
+               me.blrep = ifft(Frs)*sqrt(winN);
+           else
+               Frs(winN*2,:,:) = 0;
+               me.blrep = ifft(2*Frs)*sqrt(winN);
+           end
            
            me.sampling_rate = 2*winN/T;
            
@@ -256,11 +271,20 @@ classdef dbt
             end
             
             n = me.fullN;
-            noffset = round(me.offset./me.fullFS*n);            
-            F = fft(me.blrep )*mult/sqrt(size(me.blrep,1)/2);          
+            noffset = round(me.offset./me.fullFS*n);
+            ncol = size(me.blrep,3);
+            F = zeros(size(me.blrep));
+            for k = 1:ncol
+                F(:,:,k) = fft(me.blrep(:,:,k) )*mult/sqrt(size(me.blrep,1)/2);         
+            end
             nsh = round(me.shoulder*me.bandwidth./me.fullFS*me.fullN);
-            nnyq = size(F,1)/2;
-            ncol = size(F,3);
+            if me.centerDC
+                nnyq = size(F,1);
+                F = ifftshift(F,1)*sqrt(2);
+            else
+                nnyq = size(F,1)/2;
+            end
+            
             if nsh >0
                 % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
                 tp = me.taper.make((1:1:nsh)/nsh); 
@@ -286,6 +310,7 @@ classdef dbt
 
                         Ffull(1,k) = real(Ffull(1,k))/2;
                     end
+                    
                     Ffull(me.Norig+1:end,:) = []; 
 
 %                     Ffull(ceil(me.Norig/2)+1) = imag(Ffull(1))/2;
