@@ -12,7 +12,7 @@ function [coh,csp,w,dbs,trf] =dbtcoh(x,y,varargin)
 
 
 nx = size(x,2);    
-
+dby = [];
 if isscalar(y)
     varargin = [{y},varargin];
     y=[];
@@ -22,6 +22,7 @@ elseif ~isempty(y)
     ny = size(y,2);
 else
     ny = nx;
+    
 end
 
 dbx = dbt(x,varargin{:});
