@@ -59,7 +59,8 @@ classdef dbt
 %        taperfun =[];
         taper = [];
         padding = 'frequency';
-        centerDC = true; %%% If false (default), the pass band is demodulated 
+        userdata=[];
+        centerDC = false; %%% If false, the pass band is demodulated 
                           %%% so that 0 is the highpass limit, meaning that negative 
                           %%% frequencies contain zero padding.
                           %%% If true, the pass band is centered at 0, so
@@ -200,7 +201,7 @@ classdef dbt
                Frs = reshape(newF(noffset+1:newn/2,:),winN,nwin,ncol);
            else
               
-               nsh = ceil(me.shoulder*newbw./newfs*newn);
+               nsh = min(ceil(me.shoulder*newbw./newfs*newn),winN);
                me.shoulder = nsh*newfs./newn./newbw;
                rsmat = noffset + repmat((0:nwin-3)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin-2);
                rsmat = rsmat(:,[1, 1:end,end]);
@@ -208,9 +209,9 @@ classdef dbt
                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
                Frs = zeros([size(rsmat),ncol]);
                for  k = 1:ncol
-                    f = F(:,k);
+                    f = newF(:,k);
                    Frs(:,:,k) = double(f(rsmat));
-                   Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(nsh+1:end,end,k);
+                   Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(end-nsh+1:end,end,k);
                    Frs(1:nsh,1,k) = diag(sparse(tp))*Frs(1:nsh,1,k);
                    Frs(nsh+1:end,[1 end] ,k) = 0;
                    %Frs(1:nsh,end ,k) = 0;
@@ -296,7 +297,7 @@ classdef dbt
                 invtaper = me.taper.make(1-(1:1:nsh)/nsh);
                 for k = 1:ncol
                     sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
-                    sh(:,1) = diag(sparse(tp))*F(1:nsh,1);
+                    sh(:,1) = diag(sparse(tp))*F(1:nsh,1,k);
                     %sh(:,end) = (diag(sparse(invtaper))*F(nnyq-nsh+1:nnyq,end,k)+sh(:,end));
                     
                     F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
