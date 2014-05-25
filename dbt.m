@@ -59,6 +59,7 @@ classdef dbt
 %        taperfun =[];
         taper = [];
         padding = 'frequency';
+  		 fftpad = 0; % Additional padding to add to the fft as a proportion of unpadded length.
         userdata=[];
         centerDC = false; %%% If false, the pass band is demodulated 
                           %%% so that 0 is the highpass limit, meaning that negative 
@@ -107,6 +108,12 @@ classdef dbt
                       i = i+1;
                  case 'centerdc'
                       me.centerDC = varargin{i+1};
+                      i = i+1;
+                  case 'fftpad' % Pad fft by proportion of window size
+                      me.fftpad = varargin{i+1};
+                      i = i+1;
+                  case 'upsample' %Upsample by proportion with fft padding
+                      me.fftpad = varargin{i+1}-1;
                       i = i+1;
                   otherwise
                      error('Unrecognized keyword %s',varargin{i})
@@ -226,22 +233,28 @@ classdef dbt
                    winN = size(Frs,1);
                end
            end
-      
+           padN = floor((me.fftpad+1)*winN*(1+~me.centerDC));
+           me.fftpad = padN/winN/(1+~me.centerDC)-1;
+           
+           if padN > winN
+               Frs(padN,:,:) = 0;
+           elseif padN < winN
+               padN = winN;
+               me.fftpad = 0;
+           end
 %            me.nyqval = newF(newn/2+1,:);
            if me.centerDC
-               Frs = fftshift(Frs,1);
-               me.blrep = ifft(Frs)*sqrt(winN);
+%                Frs = fftshift(Frs,1);
+               Frs = circshift(Frs,-ceil(winN/2));
+               me.blrep = ifft(Frs)*sqrt(padN);
            else
-               Frs(winN*2,:,:) = 0;
-               me.blrep = ifft(2*Frs)*sqrt(winN);
+%                Frs(winN*2,:,:) = 0;
+               me.blrep = ifft(Frs)*sqrt(padN);
            end
            
-           if me.centerDC
-               me.sampling_rate = winN/T;
-           else
-               me.sampling_rate = 2*winN/T;
-           end       
-                              
+               
+            me.sampling_rate = padN/T;
+                 
          
 %            me.bands(1,1) = me.offset;
 %            me.bands(end,2) = me.lowpass;
@@ -284,13 +297,18 @@ classdef dbt
                 F(:,:,k) = fft(me.blrep(:,:,k) )*mult/sqrt(size(me.blrep,1)/2);         
             end
             nsh = round(me.shoulder*me.bandwidth./me.fullFS*me.fullN);
+            padN = length(me.time);
+            winN = round(padN./(1+me.fftpad)/(1+~me.centerDC)); 
             if me.centerDC
-                nnyq = size(F,1);
-                F = ifftshift(F,1)*sqrt(2);
-            else
-                nnyq = size(F,1)/2;
+%                 nnyq = size(F,1);
+                F = circshift(F,ceil(winN/2));%sqrt(2);
+                
+%                 F = ifftshift(F,1)*sqrt(2);
+%             else
             end
-            
+            F = F(1:winN,:,:)*sqrt(2);
+
+             nnyq = size(F,1);
             if nsh >0
                 % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
                 tp = me.taper.make((1:1:nsh)/nsh); 

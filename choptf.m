@@ -1,4 +1,4 @@
-function [CH,tt] = choptf(trg,times,db,trref)
+function [CH,tt,T] = choptf(trg,times,db,trref)
 
 % [CH,tt] = choptf(trange,evnt_times,db,trref)
 % Chop dbt data into epochs and normalize 
