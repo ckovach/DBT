@@ -305,6 +305,7 @@ classdef dbt
                 
 %                 F = ifftshift(F,1)*sqrt(2);
 %             else
+               % nnyq = ceil((size(F,1)+1)/2);
             end
             F = F(1:winN,:,:)*sqrt(2);
 
