@@ -361,8 +361,26 @@ classdef dbt
             data = data(1:me.Norig,:);
             fs = me.fullFS;
             
-       end
+        end
        
+        function varargout = specgram(me,normalize)
+            if nargin < 2
+                normalize = 1;
+            end
+            if normalize
+                fun = @rmbaseline;
+            else
+                fun = @(x)x.blrep;
+            end
+            S = 20*log10(abs(fun(me)))';
+            t = me.time;
+            w = me.frequency;
+            if nargout == 0
+               imagesc(t,w,S) 
+            else
+                varargout(1:3) = {S,t,w};
+            end
+        end
     end
 end
     
