@@ -246,10 +246,10 @@ classdef dbt
            if me.centerDC
 %                Frs = fftshift(Frs,1);
                Frs = circshift(Frs,-ceil(winN/2));
-               me.blrep = ifft(Frs)*sqrt(padN);
+               me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2);
            else
 %                Frs(winN*2,:,:) = 0;
-               me.blrep = ifft(Frs)*sqrt(padN);
+               me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2);
            end
            
                
@@ -352,7 +352,7 @@ classdef dbt
 %                         Ffull(me.fullN,k) = 0;
                     end
             end
-
+            Ffull = Ffull./sqrt(2);
             if hilbert
                 data = ifft(full(Ffull));
             else
