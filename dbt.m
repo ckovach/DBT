@@ -199,7 +199,7 @@ classdef dbt
            end
            nwin =size(me.bands,1);
            newF = zeros(newn,ncol);           
-           oldn = floor(nyq./fs*n)+1;
+           oldn = floor(2*nyq./fs*n);
            newF(1:oldn,:) = F(1:oldn,:);
            
            if me.shoulder == 0
@@ -210,26 +210,23 @@ classdef dbt
               
                nsh = min(ceil(me.shoulder*newbw./newfs*newn),winN);
                me.shoulder = nsh*newfs./newn./newbw;
-               rsmat = noffset + repmat((0:nwin-3)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin-2);
-               rsmat = rsmat(:,[1, 1:end,end]);
+               rsmat = noffset + repmat((-1:nwin-2)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);
+               rsmat = mod(rsmat-1,oldn)+1;
+               
+               
+              % rsmat = rsmat(:,[1, 1:end,end]);
                tp = me.taper.make((1:1:nsh)/nsh); 
                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
                Frs = zeros([size(rsmat),ncol]);
                for  k = 1:ncol
                     f = newF(:,k);
                    Frs(:,:,k) = double(f(rsmat));
-                   Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(end-nsh+1:end,end,k);
-                   Frs(1:nsh,1,k) = diag(sparse(tp))*Frs(1:nsh,1,k);
-                   Frs(nsh+1:end,[1 end] ,k) = 0;
-                   %Frs(1:nsh,end ,k) = 0;
-                  % Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(1:nsh,end,k);
-                   
-                   %%% Now add the taper
-    %                Frs(end+(1-nsh:0),1:nwin-1) = diag(sparse(taper))*Frs(end+(1-nsh:0),1:nwin-1);
-                     Frs(end+(1-nsh:0),1:nwin-1,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin-1,k);
+%                    Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(end-nsh+1:end,end,k);
+%                    Frs(1:nsh,1,k) = diag(sparse(tp))*Frs(1:nsh,1,k);
+                
+                    Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
 
-                   %%% subptract the tapered component from the next band
-                   Frs(1:nsh,2:nwin-1,k) = diag(sparse(invtaper))*Frs(1:nsh,2:nwin-1,k); % - Frs(end+(1-nsh:0),1:nwin-1);
+                   Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
                    winN = size(Frs,1);
                end
            end
@@ -316,7 +313,7 @@ classdef dbt
                 invtaper = me.taper.make(1-(1:1:nsh)/nsh);
                 for k = 1:ncol
                     sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
-                    sh(:,1) = diag(sparse(tp))*F(1:nsh,1,k);
+                   % sh(:,1) = diag(sparse(tp))*F(1:nsh,1,k);
                     %sh(:,end) = (diag(sparse(invtaper))*F(nnyq-nsh+1:nnyq,end,k)+sh(:,end));
                     
                     F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
