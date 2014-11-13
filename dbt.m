@@ -362,7 +362,7 @@ classdef dbt
        
         function varargout = specgram(me,normalize)
             if nargin < 2
-                normalize = 1;
+                normalize = 0;
             end
             if normalize
                 fun = @rmbaseline;
