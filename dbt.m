@@ -188,19 +188,21 @@ classdef dbt
 %                F(1,:) = F(1,:) + 1i*F(newn/2+1,:);
 %            end
              me.bandwidth = newbw;
-           if me.shoulder ~=0
-               me.bands(:,1) = [me.offset,me.offset + me.shoulder/2*newbw:newbw:me.lowpass-newbw,me.lowpass- me.shoulder/2*newbw];
-               me.bands(2:end-1,2) = me.bands(2:end-1,1)+bw;
-               me.bands([1 end],2) = me.bands([1 end],1)+bw*me.shoulder/2;
-           else
-               me.bands = [me.offset :newbw:me.lowpass-newbw;...
-                           (me.offset + newbw) :newbw:me.lowpass ]';
-               
-           end
+%            if me.shoulder ~=0
+               me.bands(:,1) = [me.offset-newbw*(1+me.shoulder)/2:newbw:me.lowpass-newbw*(1+me.shoulder)/2];%-newfs/newn;
+               me.bands(:,2) = me.bands(:,1)+newbw*(1+me.shoulder);%+newfs/newn;
+% %               me.bands([1 end],2) = me.bands([1 end],1)+newbw*me.shoulder/2;
+%            else
+%                me.bands = [me.offset :newbw:me.lowpass-newbw;...
+%                            (me.offset + newbw) :newbw:me.lowpass ]';
+%                
+%            end
            nwin =size(me.bands,1);
            newF = zeros(newn,ncol);           
-           oldn = floor(2*nyq./fs*n);
-           newF(1:oldn,:) = F(1:oldn,:);
+           oldn =size(F,1);
+           %newF(1:oldn,:) = F(1:oldn,:);
+           indx = -floor(oldn/2):ceil(oldn/2)-1;
+           newF(mod(indx,newn)+1,:) = F(mod(indx,oldn)+1,:);
            
            if me.shoulder == 0
 %                nwin = nwin-2;
@@ -210,8 +212,10 @@ classdef dbt
               
                nsh = min(ceil(me.shoulder*newbw./newfs*newn),winN);
                me.shoulder = nsh*newfs./newn./newbw;
+               
+               %%% Reshaping matrix
                rsmat = noffset + repmat((-1:nwin-2)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);
-               rsmat = mod(rsmat-1,oldn)+1;
+               rsmat = mod(rsmat-1,newn)+1;
                
                
               % rsmat = rsmat(:,[1, 1:end,end]);
@@ -318,7 +322,7 @@ classdef dbt
                     
                     F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
                 end
-                    F(:,1,:) = [];
+                  %  F(:,1,:) = [];
                  
             end
             F(nnyq-nsh+1:end,:,:) = [];
@@ -328,7 +332,7 @@ classdef dbt
                     for k = 1:ncol
                       f = F(:,:,k);
 
-                       Ffull(noffset+(1:numel(f)),k) = f(:)*sqrt(me.Norig);
+                       Ffull(mod(noffset+(1:numel(f))-floor(winN/2)-1,me.fullN)+1,k) = f(:)*sqrt(me.Norig);
                        Ffull(floor(me.Norig/2+.5)+1,k) = Ffull(floor(me.Norig/2+.5)+1,k)/2; 
                        Ffull(ceil(me.Norig/2+.5)+1:me.Norig,k) = 0; 
 
@@ -342,9 +346,9 @@ classdef dbt
                  case 'time'
                     for k = 1:ncol
                         f = F(:,:,k);
-                        Ffull(noffset+(1:numel(f)),k) = f(:)*sqrt(me.fullN);
+                        Ffull(mod(noffset+(1:numel(f))-floor(winN/2),me.fullN)+1,k) = f(:)*sqrt(me.fullN);
 
-                        Ffull(me.fullN/2+1,k) = imag(Ffull(1,k))/2;
+                    %    Ffull(me.fullN/2+1,k) = imag(Ffull(1,k))/2;
                         Ffull(1,k) = real(Ffull(1,k))/2;
 %                         Ffull(me.fullN,k) = 0;
                     end
