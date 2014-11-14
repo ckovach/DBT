@@ -13,7 +13,7 @@ function [xypac,amp,rmph] = dbtpac(X,Y,fs,varargin)
 % $Author$
 % ------------------------------------------------
 
-phasebw = 4;
+phasebw = 2;
 ampbw =40; 
 phaserange = [0.01 24];
 amprange = [40 300];
@@ -57,7 +57,7 @@ while i < length(varargin)
            exclude_time= varargin{i+1};
            i = i+1;
        otherwise
-           error('Unrecognized keyword %i',varargin{i+1})
+           error('Unrecognized keyword %s',varargin{i+1})
    end
    i = i+1;
 end
@@ -70,7 +70,7 @@ fprintf('\nAmplitude: %4i',0)
 for i = 1:size(Y,2)
     fprintf('\b\b\b\b%4i',i)
     y = Y(:,i);
-    dbamp = dbt(y,fs,ampbw,'padding','frequency','lowpass',amprange(2),'offset',amprange(1));
+    dbamp = dbt(y,ampargs{:});
 %     dbampdb = dbt(abs(dbamp.blrep),dbamp.sampling_rate,phasebw,'padding','frequency','lowpass',phaserange(2),'offset',phaserange(1));
     a = zscore(bpfilt(abs(dbamp.blrep),[dbamp.sampling_rate phaserange ]));  
     w = (0:size(a,1)-1)/size(a,1)*dbamp.sampling_rate;
@@ -129,7 +129,9 @@ end
 
 %%% Construct remodulator to adjust phase to a correct value 
 %%% at the sampled time
-rmf = dbph.bands(:,1)-dbph.shoulder/2*dbph.bandwidth;
+%rmf = dbph.bands(:,1)-dbph.shoulder/2*dbph.bandwidth;
+rmf = dbph.bands(:,1);
+
 remodulator = repmat(permute(exp(2*pi*1i*rmf*ampt)',[1 3 2]), [1 nx  1  ]);
 
 if ~isscalar(exclude_time)
