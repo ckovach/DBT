@@ -38,7 +38,8 @@ for i = 1:nch
 
         if ~isempty(trref)
             %%% normalizing by mean envelope
-            nrm = repmat(mean(abs(x(Tref))),length(tt),1);
+%            nrm = repmat(mean(abs(x(Tref))),length(tt),1);
+            nrm = repmat(exp(mean(log(abs(x(Tref))))),length(tt),1);
         end
         CH(:,k,:,i) = x(T)./nrm;
     end
