@@ -53,7 +53,7 @@ classdef dbt
         fullN = 0;    %%% Length of the signal after padding
         fullFS = 0;   %%% Sampling frequency of the reconstructed signal
         Norig = 0;    %%% Original signal length before padding
-        nyqval = 0;   %%% fft value at the nyquist frequency
+        %nyqval = 0;   %%% fft value at the nyquist frequency
         shoulder = 1; %%% Degree of frequency overlap between neighboring bands (0 - 1)
         lowpass = []; %%% Lowpass cutoff
 %        taperfun =[];
@@ -201,7 +201,7 @@ classdef dbt
            newF = zeros(newn,ncol);           
            oldn =size(F,1);
            %newF(1:oldn,:) = F(1:oldn,:);
-           indx = -floor(oldn/2):ceil(oldn/2)-1;
+           indx = -floor(oldn/2):ceil((oldn+1)/2);
            newF(mod(indx,newn)+1,:) = F(mod(indx,oldn)+1,:);
            
            if me.shoulder == 0
@@ -232,6 +232,10 @@ classdef dbt
 
                    Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
                    winN = size(Frs,1);
+                   % Frs(:,1) = Frs(:,1)/sqrt(2);
+%                    Frs(ceil(end/2):end,end) = 0;
+                    Frs(rsmat(:, end)>ceil(newn/2),end)=0;
+                    Frs(rsmat(:, 1)>ceil(newn/2),1)=0;
                end
            end
            padN = floor((me.fftpad+1)*winN*(1+~me.centerDC));
@@ -363,7 +367,7 @@ classdef dbt
             fs = me.fullFS;
             
         end
-       
+       %%%%
         function varargout = specgram(me,normalize)
             if nargin < 2
                 normalize = 0;
