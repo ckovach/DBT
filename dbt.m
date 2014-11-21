@@ -243,13 +243,13 @@ classdef dbt
 %                    Frs(ceil(end/2):end,end) = 0;
 
                     %%% Set all negative frequencies to zero
-                    Frs(rsmat(:, end)>ceil((newn+1)/2),end)=0;
-                    Frs(rsmat(:, 1)>ceil((newn+1)/2),1)=0;
+                    Frs(rsmat(:, end)>ceil((newn+1)/2),end,k)=0;
+                    Frs(rsmat(:, 1)>ceil((newn+1)/2),1,k)=0;
                     
                     %%% Corrections for DC and Nyquist to preserve power
                     %%% after zeroing negative frequencies
-                    Frs(rsmat(:,1)==1,1)=Frs(rsmat(:,1)==1,1)/sqrt(2); 
-                    Frs(rsmat(:,end)==newn/2+1,end) = Frs(rsmat(:,end)==newn/2+1,end)/sqrt(2); %% Nyquist adjusted for even length  
+                    Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
+                    Frs(rsmat(:,end)==newn/2+1,end,k) = Frs(rsmat(:,end)==newn/2+1,end,k)/sqrt(2); %% Nyquist adjusted for even length  
                end
 %            end
            padN = floor((me.fftpad+1)*winN*(1+~me.centerDC));
