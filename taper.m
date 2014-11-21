@@ -38,11 +38,11 @@ classdef taper
     properties
         
         
-        generator = @(x)1/2*(1+cos(x*pi));
+        generator = @(x)cos(x*pi/2);
         
         summation_order=2;
         
-        symmetric = true;
+        symmetric = false;
     end
     
     methods
@@ -54,7 +54,8 @@ classdef taper
             h = me.generator;
             p = me.summation_order;
             if p > 0
-                g = @(x) (x>=0).*h(abs(x)) + (x<0).*(1-(h(1-abs(x)).^p)).^(1/p);
+              %  g = @(x) (x>=0).*h(abs(x)) + (x<0).*(1-(h(1-abs(x)).^p)).^(1/p);
+                g = @(x) (mod(x,2)-1<0 | x==0).*h(mod(x,2)) + (mod(x,2)-1>=0 & x~=0).*(1-h(mod(x,2)-1).^p).^(1/p);
                                
             else
                 g = h;

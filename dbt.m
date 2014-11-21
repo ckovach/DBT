@@ -155,7 +155,7 @@ classdef dbt
            switch me.padding
                case 'time'
                   T = newn./fs;
-                 fullsig(newn) = 0; 
+                 fullsig(end+1:newn) = 0; 
               
                  
                case 'frequency'
@@ -204,40 +204,54 @@ classdef dbt
            indx = -floor(oldn/2):ceil((oldn+1)/2);
            newF(mod(indx,newn)+1,:) = F(mod(indx,oldn)+1,:);
            
-           if me.shoulder == 0
-%                nwin = nwin-2;
-                nwin = K;
-               Frs = reshape(newF(noffset+1:newn/2,:),winN,nwin,ncol);
-           else
+%            if me.shoulder == 0
+% %                nwin = nwin-2;
+%                 nwin = K;
+%                Frs = reshape(newF(noffset+1:newn/2,:),winN,nwin,ncol);
+%            else
               
                nsh = min(ceil(me.shoulder*newbw./newfs*newn),winN);
                me.shoulder = nsh*newfs./newn./newbw;
                
-               %%% Reshaping matrix
-               rsmat = noffset + repmat((-1:nwin-2)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);
+               %%% Reshaping matrix. This step includes the initial
+               %%% circular shift.
+%               rsmat = noffset + repmat((-1:nwin-2)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);
+            %   rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin) - floor(winN/2);
+               rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin) -nsh;
                rsmat = mod(rsmat-1,newn)+1;
                
                
               % rsmat = rsmat(:,[1, 1:end,end]);
-               tp = me.taper.make((1:1:nsh)/nsh); 
-               invtaper = me.taper.make(1-(1:1:nsh)/nsh);
+%                tp = me.taper.make((1:1:nsh)/nsh); 
+%                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
+                tp = me.taper.make((0:1:nsh-1)/nsh); 
+                invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+           
                Frs = zeros([size(rsmat),ncol]);
                for  k = 1:ncol
                     f = newF(:,k);
                    Frs(:,:,k) = double(f(rsmat));
 %                    Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(end-nsh+1:end,end,k);
 %                    Frs(1:nsh,1,k) = diag(sparse(tp))*Frs(1:nsh,1,k);
-                
-                    Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
+                   if nsh>0
+                        Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
 
-                   Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
+                       Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
+                   end
                    winN = size(Frs,1);
                    % Frs(:,1) = Frs(:,1)/sqrt(2);
 %                    Frs(ceil(end/2):end,end) = 0;
-                    Frs(rsmat(:, end)>ceil(newn/2),end)=0;
-                    Frs(rsmat(:, 1)>ceil(newn/2),1)=0;
+
+                    %%% Set all negative frequencies to zero
+                    Frs(rsmat(:, end)>ceil((newn+1)/2),end)=0;
+                    Frs(rsmat(:, 1)>ceil((newn+1)/2),1)=0;
+                    
+                    %%% Corrections for DC and Nyquist to preserve power
+                    %%% after zeroing negative frequencies
+                    Frs(rsmat(:,1)==1,1)=Frs(rsmat(:,1)==1,1)/sqrt(2); 
+                    Frs(rsmat(:,end)==newn/2+1,end) = Frs(rsmat(:,end)==newn/2+1,end)/sqrt(2); %% Nyquist adjusted for even length  
                end
-           end
+%            end
            padN = floor((me.fftpad+1)*winN*(1+~me.centerDC));
            me.fftpad = padN/winN/(1+~me.centerDC)-1;
            
@@ -317,30 +331,34 @@ classdef dbt
              nnyq = size(F,1);
             if nsh >0
                 % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
-                tp = me.taper.make((1:1:nsh)/nsh); 
-                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
+                tp = me.taper.make((0:1:nsh-1)/nsh); 
+                invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
                 for k = 1:ncol
-                    sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
-                   % sh(:,1) = diag(sparse(tp))*F(1:nsh,1,k);
-                    %sh(:,end) = (diag(sparse(invtaper))*F(nnyq-nsh+1:nnyq,end,k)+sh(:,end));
+%                     sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
+                    sh = diag(sparse(invtaper))*F(1:nsh,2:end,k);
                     
-                    F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
+%                     F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
+                    F(nnyq-nsh+1:nnyq,1:end-1,k) = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k)+sh;
                 end
                   %  F(:,1,:) = [];
                  
             end
-            F(nnyq-nsh+1:end,:,:) = [];
+%             F(nnyq-nsh+1:end,:,:) = [];
+            F(1:nsh,:,:)=[];
             Ffull = zeros(me.fullN,ncol);
             switch me.padding
                 case {'frequency','fft'}
                     for k = 1:ncol
                       f = F(:,:,k);
 
-                       Ffull(mod(noffset+(1:numel(f))-floor(winN/2)-1,me.fullN)+1,k) = f(:)*sqrt(me.Norig);
-                       Ffull(floor(me.Norig/2+.5)+1,k) = Ffull(floor(me.Norig/2+.5)+1,k)/2; 
+                       Ffull(mod(noffset+(1:numel(f))-floor(winN/2)-1+winN/2,me.fullN)+1,k) = f(:)*sqrt(me.Norig);
+                       %Ffull(floor(me.Norig/2+.5)+1,k) = Ffull(floor(me.Norig/2+.5)+1,k)/2; 
                        Ffull(ceil(me.Norig/2+.5)+1:me.Norig,k) = 0; 
-
-                        Ffull(1,k) = real(Ffull(1,k))/2;
+                        
+                       if ~mod(me.fullN,2)
+                            Ffull(me.fullN/2+1,k) = Ffull(me.fullN/2+1,k)/sqrt(2);
+                       end
+                       Ffull(1,k) = real(Ffull(1,k))/sqrt(2);
                     end
                     
                     Ffull(me.Norig+1:end,:) = []; 
@@ -350,14 +368,16 @@ classdef dbt
                  case 'time'
                     for k = 1:ncol
                         f = F(:,:,k);
-                        Ffull(mod(noffset+(1:numel(f))-floor(winN/2),me.fullN)+1,k) = f(:)*sqrt(me.fullN);
+                       Ffull(mod(noffset+(1:numel(f))-floor(winN/2)-1+winN/2,me.fullN)+1,k) = f(:)*sqrt(me.Norig);
+%                         Ffull(mod(noffset+(1:numel(f))-floor(winN/2),me.fullN)+1,k) = f(:)*sqrt(me.fullN);
 
-                    %    Ffull(me.fullN/2+1,k) = imag(Ffull(1,k))/2;
-                        Ffull(1,k) = real(Ffull(1,k))/2;
+                        Ffull(ceil(me.fullN/2+1),k) = Ffull(ceil(me.fullN/2+1),k)/sqrt(2);
+                        Ffull(1,k) = real(Ffull(1,k))/sqrt(2);
 %                         Ffull(me.fullN,k) = 0;
                     end
             end
             Ffull = Ffull./sqrt(2);
+            %Ffull = circshift(Ffull,-nsh);
             if hilbert
                 data = ifft(full(Ffull));
             else
