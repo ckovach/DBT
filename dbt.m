@@ -148,7 +148,7 @@ classdef dbt
            bw =  varargin{3};
 %            me.decim = decim;
            
-           bandwindows = 0:bw:fs/2-bw;
+           %bandwindows = 0:bw:fs/2-bw;
            
            fullsig  = varargin{1};
            %nyq = bandwindows(end)+bw;
