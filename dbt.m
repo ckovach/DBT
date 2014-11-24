@@ -151,7 +151,7 @@ classdef dbt
            bandwindows = 0:bw:fs/2-bw;
            
            fullsig  = varargin{1};
-           nyq = bandwindows(end)+bw;
+           %nyq = bandwindows(end)+bw;
            
            n = size(fullsig,1);
            ncol = size(fullsig,2);
@@ -208,7 +208,7 @@ classdef dbt
 %            end
              me.bandwidth = newbw;
 %            if me.shoulder ~=0
-               me.bands(:,1) = [me.offset-newbw*(1+me.shoulder)/2:newbw:me.lowpass-newbw*(1+me.shoulder)/2];%-newfs/newn;
+               me.bands(:,1) = (me.offset-newbw*(1+me.shoulder)/2:newbw:me.lowpass-newbw*(1+me.shoulder)/2);%-newfs/newn;
                me.bands(:,2) = me.bands(:,1)+newbw*(1+me.shoulder);%+newfs/newn;
 % %               me.bands([1 end],2) = me.bands([1 end],1)+newbw*me.shoulder/2;
 %            else
