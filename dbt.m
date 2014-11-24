@@ -6,7 +6,8 @@ classdef dbt
 %
 %  B = dbt(X,Fs,BW)
 %
-%  X  - Signal as a column vector
+%  X  - Signal as a column vector. If X is a matrix, each column is a separate
+%        signal.
 %  Fs - Sampling frequency
 %  BW - Bandwidth of decomposition
 % 
@@ -15,8 +16,9 @@ classdef dbt
 %
 %  B is an object with the following properties:
 %
-%  B.blrep:   time-frequency coefficients with rows corresponding to time
-%  and columns to frequency.
+%  B.blrep: time-frequency coefficients with rows corresponding to time
+%           and columns to frequency. If X is a matrix, channels correspond to the
+%           3rd dimension.
 %   .bandwidth:  bandwidth of the DBT.
 %   .sampling_rate: sampling rate after the transform.
 %   .time:  sampled time points.
@@ -24,9 +26,9 @@ classdef dbt
 %   .bands: band limits for each frequency band/
 %   .taper: taper used to window frequency bands.
 %   .padding: whether signal duration is adjusted through time padding
-%       ('time') or fequency padding ('frequency').
+%             ('time') or fequency padding ('frequency').
 %   .fftpad: degree of oversampling achieved through fft padding. 1
-%       corresponds to 2x oversampling.
+%            corresponds to 2x oversampling.
 %   .centerDC: If false (default), the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
 %               otherwise each band is demodulated to be centered on DC.
