@@ -1,7 +1,6 @@
 classdef dbt
 
-% The band limited data class for efficient representation of
-% band-limited data using the Nyquist sampling theorem. 
+% This class implements the demodulated band transform (DBT). 
 % 
 % Use:
 %
@@ -13,6 +12,26 @@ classdef dbt
 % 
 %
 %  B = dbt(X,Fs,Bw, ['option'], [value])
+%
+%  B is an object with the following properties:
+%
+%  B.blrep:   time-frequency coefficients with rows corresponding to time
+%  and columns to frequency.
+%   .bandwidth:  bandwidth of the DBT.
+%   .sampling_rate: sampling rate after the transform.
+%   .time:  sampled time points.
+%   .frequency: sampled center frequencies/
+%   .bands: band limits for each frequency band/
+%   .taper: taper used to window frequency bands.
+%   .padding: whether signal duration is adjusted through time padding
+%       ('time') or fequency padding ('frequency').
+%   .fftpad: degree of oversampling achieved through fft padding. 1
+%       corresponds to 2x oversampling.
+%   .centerDC: If false (default), the fft of the DBT bands contains
+%               positive frequencies only, implying 2x oversampling,
+%               otherwise each band is demodulated to be centered on DC.
+%   
+%
 %  Options:
 %
 %  	offset   -  offset of the first band from 0hz (default = 0)
