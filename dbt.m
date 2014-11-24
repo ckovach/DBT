@@ -58,10 +58,10 @@ classdef dbt
 %           inverse DBT transform. B.signal(bands) returns the reconstructed 
 %           signal including only the specified bands. bands can be a
 %           logical or numerical index into frequency bands. 
-%           Example:  B.signal(B.frequency < 200) resturns the signal including 
+%           Example:  B.signal(B.frequency < 200) returns the signal including 
 %           only bands with center frequency below 200.
-%           B.signal(bands,true) returns the analytic signal, containing
-%           only positive frequencies.
+%           B.signal(bands,true) returns the complex-valued analytic signal, 
+%           containing only positive frequencies.
 %           
 % B.specgram: plots a spectrogram based on the DBT. B.specgram(true) normalizes
 %             the spectrogram with smoothing. 
