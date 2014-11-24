@@ -35,8 +35,8 @@ classdef dbt
 %  Options:
 %
 %  	offset   -  offset of the first band from 0hz (default = 0)
-%       padding  - 'time': pad signal in the time domain, changing duration (default)
-%                  'frequency': pad in the frequency domain, changing sampling rate
+%       padding  - 'time': pad signal in the time domain, changing duration
+%                  'frequency': (default) pad in the frequency domain, changing sampling rate
 %       shoulder - (0 - 1) degree of overlap between neighboring bands (default = 1). 
 %                  Note that, at present, 1 is the maximum allowable value.
 %
