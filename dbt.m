@@ -51,7 +51,20 @@ classdef dbt
 %    	          BW              shoulder
 %      
 % By default,  the taper is defined so that squares sum to 1
-
+%
+% Methods:
+%
+% B.signal: Returns the signal reconstructed from DBT coefficients via the
+%           inverse DBT transform. B.signal(bands) returns the reconstructed 
+%           signal including only the specified bands. bands can be a
+%           logical or numerical index into frequency bands. 
+%           Example:  B.signal(B.frequency < 200) resturns the signal including 
+%           only bands with center frequency below 200.
+%           B.signal(bands,true) returns the analytic signal, containing
+%           only positive frequencies.
+%           
+% B.specgram: plots a spectrogram based on the DBT. B.specgram(true) normalizes
+%             the spectrogram with smoothing. 
 
 %     C Kovach 2013
 % 
