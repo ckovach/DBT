@@ -66,7 +66,7 @@ classdef dbt
 % B.specgram: plots a spectrogram based on the DBT. B.specgram(true) normalizes
 %             the spectrogram with smoothing. 
 %
-% See TAPER, DBTCOH, DBTDENOISE, DBTPAC, STFT
+% See also TAPER, DBTCOH, DBTDENOISE, DBTPAC, STFT
 
 %     C Kovach 2013
 % 
