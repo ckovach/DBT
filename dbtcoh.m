@@ -55,7 +55,11 @@ for i = 1:length(dbx.frequency)
 end
     
 if nargout > 3
-    dbs = [dbx,dby];
+    if isequal(x,y)
+        dbs = dbx;
+    else
+        dbs = [dbx,dby];
+    end
 end
 
 

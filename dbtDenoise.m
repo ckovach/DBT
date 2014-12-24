@@ -70,18 +70,21 @@ use_stft = false;
 zhithresh = 6;
 zlothresh = 3;
 makeplots = false;
+%smoothing_method = 'polynomial';
+smoothing_method = 'moving_average';
+smbw = 10;
 i = 1;
-while i < length(varargin)
+while i <= length(varargin)
           switch lower(varargin{i})
 
               case {'stft'}  % use stft instead of bld
                   use_stft = true; 
                   varargin(i) = [];
-                  i = i-1;
+                  %i = i-1;
               case {'dbt'}  % use stft instead of dbt
                   use_stft = false;                        
                   varargin(i) = [];
-                  i = i-1;
+                  %i = i-1;
               case {'kurtosis','kthresh'}  % Apply a lower filter threshold for frequency values that have kurtosis exceeding this value
                   kurtosis_threshold = varargin{i+1};
                   varargin(i:i+1) = [];
@@ -111,6 +114,16 @@ while i < length(varargin)
                   makeplots = varargin{i+1};
                   varargin(i:i+1) = []; 
                   i = i-1;                
+                case {'smoothing method'} 
+                  smoothing_method = varargin{i+1};
+                  varargin(i:i+1) = []; 
+                  i = i-1;               
+                case {'smoothing bandwidth'} 
+                  %Bandwidth of moving average for 'moving average' method
+                  smbw = varargin{i+1};
+                  varargin(i:i+1) = []; 
+                  i = i-1;               
+                  
               otherwise
 %                  error('Unrecognized keyword %s',varargin{i})
           end
@@ -137,14 +150,22 @@ end
 
 if ~use_stft
     blsig = dbt(x,fs,bandwidth,'padding','time','shoulder',shoulder,varargin{:}); % Band limited representation of the signal (see dbt)
+    nsmbw = ceil(smbw./blsig.bandwidth);
 else
     blsig = stft(x,fs,bandwidth,'shoulder',shoulder,varargin{:}); % Band limited representation of the signal (see dbt)    
+    nsmbw = ceil(smbw.*blsig.timewindow);
 end
 w = blsig.frequency;
 
 kt = kurtosis(abs(blsig.blrep));
-nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold); %takes out the baseline by fitting a polynomial
 
+switch smoothing_method
+    case 'polynomial'
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method); %takes out the baseline by fitting a polynomial
+    case 'moving_average'
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw); %takes out the baseline by fitting a polynomial
+        
+end
 mn = mean(abs(nsig));
 
 

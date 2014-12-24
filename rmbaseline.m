@@ -1,5 +1,5 @@
 
-function [out,bl] = rmbaseline(bx,usepts)
+function [out,bl] = rmbaseline(bx,usepts,varargin)
 
 
 % Fits a polynomial to the spectrum and normalizes by the fitted value.
@@ -13,16 +13,36 @@ function [out,bl] = rmbaseline(bx,usepts)
 % $Author$
 % ------------------------------------------------
 
+smoothing_method = 'polynomial';
+
 if nargin < 2 || isempty(usepts)
     usepts = true;
 end
-polyord = 8;
+if nargin < 3
+    polyord = 8;
+elseif isnumeric(varargin{1})
+    polyord = varargin{1};
+else
+    
+    smoothing_method = varargin{1};
+    if nargin < 4,
+        smoothbw = 10;
+    else
+        smoothbw = varargin{2};
+    end
+end
 
 mn = mean(abs(bx.blrep),1);
-kp = find(mn~=0 & usepts);
-p = polyfit(kp./length(mn),log(mn(kp)),polyord);
-
-bl = polyval(p,(1:length(mn))/length(mn));
+kp = mn~=0 & usepts;
+switch smoothing_method
+    case 'polynomial'
+        p = polyfit(find(kp)./length(mn),log(mn(kp)),polyord);
+        bl = polyval(p,(1:length(mn))/length(mn));
+    case 'moving_average'
+        g = rectwin(smoothbw)';
+        bl = log(convn(mn.*kp,g,'same')./convn(kp,g,'same'));
+        
+end
 
 
 
