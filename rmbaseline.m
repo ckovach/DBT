@@ -18,9 +18,8 @@ smoothing_method = 'polynomial';
 if nargin < 2 || isempty(usepts)
     usepts = true;
 end
-if nargin < 3
-    polyord = 8;
-elseif isnumeric(varargin{1})
+ polyord = 8;
+if nargin < 2 &&  isnumeric(varargin{1})
     polyord = varargin{1};
 else
     
