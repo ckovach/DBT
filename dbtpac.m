@@ -1,6 +1,7 @@
 function [xypac,amp,rmph] = dbtpac(X,Y,fs,varargin)
 
-% function dbtpac(x,y,fs,varargin)
+% out = dbtpac(x,y,fs,varargin)
+% 
 %
 % Efficiently computes phase-amplitude coupling with the dbt transform
 % Phase is computed from x and amplitude from y. Because the amplitdue 
@@ -8,6 +9,10 @@ function [xypac,amp,rmph] = dbtpac(X,Y,fs,varargin)
 % averaged over intervening steps. 
 
 
+% The output, out, is a struct with phase-amplitude coherence in the field out.PAC. 
+% out.PAC is a 4-d matrix with the result arranged as channel(amplitude) x
+% channel(phase) x amplitude bands x phase bands.
+% 
 % ----------- SVN REVISION INFO ------------------
 % $URL$
 % $Revision$
@@ -59,7 +64,7 @@ while i < length(varargin)
            exclude_time= varargin{i+1};
            i = i+1;
        otherwise
-           error('Unrecognized keyword %s',varargin{i+1})
+           error('Unrecognized keyword %s',varargin{i})
    end
    i = i+1;
 end
@@ -137,7 +142,7 @@ rmf = dbph.bands(:,1);
 remodulator = repmat(permute(exp(2*pi*1i*rmf*ampt)',[1 3 2]), [1 nx  1  ]);
 
 if ~isscalar(exclude_time)
-   ext = (0:length(exclude_time))/fs;
+   ext = (0:length(exclude_time)-1)/fs;
    gett = interp1(ext,double(exclude_time),ampt,'nearest')>0;
 else
     gett = true(size(ampt));
