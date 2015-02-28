@@ -10,22 +10,58 @@ function [coh,csp,w,dbs,trf] =dbtcoh(x,y,varargin)
 % $Author$
 % ------------------------------------------------
 
+i = 1;
+dbtargs = {};
+keep_time=[];
+while i < length(varargin)
+    
+   switch varargin{i}
+       
+       case 'keep time'
+           keep_time = varargin{i+1};
+           i = i+1;
+       otherwise
+           dbtargs = [dbtargs,varargin(i:i+1)];
+           i=i+1;
+   end
+   
+   i=i+1;
+end
 
-nx = size(x,2);    
-dby = [];
-if isscalar(y)
-    varargin = [{y},varargin];
+if ~isa(x,'dbt')
+ 
+    nx = size(x,2);    
+else
+    dbx = x;
+    nx = size(dbx.blrep,3);
+end
+
+ dby = [];
+if isscalar(y) && ~isa(y,'dbt')
+    dbtargs = [{y},dbtargs];
     y=[];
     ny = nx;
 elseif ~isempty(y) 
-    dby = dbt(y,varargin{:});
-    ny = size(y,2);
+    if ~isa(y,'dbt')
+        dby = dbt(y,dbtargs{:});
+        ny = size(y,2);
+    else
+        dby = y;
+        ny = size(dby.blrep,3);
+    end
 else
-    ny = nx;
-    
+    ny = nx;    
 end
 
-dbx = dbt(x,varargin{:});
+if ~isa(x,'dbt')
+    dbx = dbt(x,dbtargs{:});
+end
+
+if isempty(keep_time)
+    keepT = true(size(dbx.time));
+else
+    keepT = resampi(keep_time,dbtargs{1},dbx.sampling_rate,'linear')>.5;
+end
 
 w = dbx.frequency;
 csp = zeros(nx,ny,length(w));
@@ -35,11 +71,11 @@ if nargout > 4
 end
 for i = 1:length(dbx.frequency)
         
-        blx = squeeze(dbx.blrep(:,i,:));
+        blx = squeeze(dbx.blrep(keepT,i,:));
         if isempty(y)
             bly = blx;
         else
-            bly = squeeze(dby.blrep(:,i,:));
+            bly = squeeze(dby.blrep(keepT,i,:));
         end
         csp(:,:,i) = blx'*bly;
         if isempty(y)
