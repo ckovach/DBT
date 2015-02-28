@@ -1,11 +1,13 @@
 function [xypac,amp,rmph] = dbtpac(X,Y,fs,varargin)
 
 % function dbtpac(x,y,fs,varargin)
+%
 % Efficiently computes phase-amplitude coupling with the dbt transform
 % Phase is computed from x and amplitude from y. Because the amplitdue 
 % component is necessarily sampled at a higher bandwidth, the result is
 % averaged over intervening steps. 
-%
+
+
 % ----------- SVN REVISION INFO ------------------
 % $URL$
 % $Revision$

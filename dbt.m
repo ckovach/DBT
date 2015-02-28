@@ -92,7 +92,6 @@ classdef dbt
         %nyqval = 0;   %%% fft value at the nyquist frequency
         shoulder = 1; %%% Degree of frequency overlap between neighboring bands (0 - 1)
         lowpass = []; %%% Lowpass cutoff
-%        taperfun =[];
         taper = [];
         padding = 'frequency';
   		 fftpad = 0; % Additional padding to add to the fft as a proportion of unpadded length.
@@ -104,8 +103,7 @@ classdef dbt
                           %%% that the signal contains negative
                           %%% frequencies, which halves the number of
                           %%% samples.
-                          
-%         taper = 'quadratic'; 
+        direction = 'acausal'; %%% acausal (default), causal, or anti-causal                  
     end
     
     
@@ -151,6 +149,9 @@ classdef dbt
                   case 'upsample' %Upsample by proportion with fft padding
                       me.fftpad = varargin{i+1}-1;
                       i = i+1;
+                  case 'direction'
+                      me.direction = varargin{i+1};
+                      i=i+1;
                   otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
@@ -262,7 +263,25 @@ classdef dbt
 %                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
                 tp = me.taper.make((0:1:nsh-1)/nsh); 
                 invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
-           
+                
+               switch me.direction
+                %%% Approximate causal or anti-causal filters while
+                %%% preserving summation properties of the tapers.
+                   
+                   case {'causal','anticausal'}
+                       htptp = hilbert([tp,invtaper]);
+                       htptp = htptp./abs(htptp);
+                       if strcmp(me.direction,'causal')
+                          htptp = conj(htptp);  
+                       end
+                       tp = htptp(1:length(tp)).*tp;
+                       invtaper = htptp(length(tp)+(1:length(invtaper))).*invtaper;                       
+                   case 'acausal'
+                       % do nothing
+                   otherwise
+                       error('Unrecognized filter direction, %s.',me.direction)
+               end
+                   
                Frs = zeros([size(rsmat),ncol]);
                for  k = 1:ncol
                     f = newF(:,k);
@@ -325,7 +344,7 @@ classdef dbt
 
         %%%%
 
-        function [data,fs] = signal(me,columnfilter,hilbert)
+        function [data,fs] = signal(me,columnfilter,doHilbert)
             
             %%% Reconstruct the signal from its band-limited analytic representation
             if nargin < 2 || isempty(columnfilter)
@@ -340,8 +359,8 @@ classdef dbt
                 mult = columnfilter;
             end
             
-            if nargin < 3 || isempty(hilbert)
-               hilbert = false; 
+            if nargin < 3 || isempty(doHilbert)
+               doHilbert = false; 
             end
             
             n = me.fullN;
@@ -369,6 +388,24 @@ classdef dbt
                 % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
                 tp = me.taper.make((0:1:nsh-1)/nsh); 
                 invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+                switch me.direction
+                %%% Approximate causal or anti-causal filters while
+                %%% preserving summation properties of the tapers.
+                   
+                   case {'causal','anticausal'}
+                       htptp = hilbert([tp,invtaper]);
+                       htptp = htptp./abs(htptp);
+                       if strcmp(me.direction,'anticausal')
+                          htptp = conj(htptp);  
+                       end
+                       tp = htptp(1:length(tp)).*tp;
+                       invtaper = htptp(length(tp)+(1:length(invtaper))).*invtaper;                       
+                    case 'acausal'
+                        % Do nothing.
+                   otherwise
+                       error('Unrecognized filter direction, %s.',me.direction)
+                end
+               
                 for k = 1:ncol
 %                     sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
                     sh = diag(sparse(invtaper))*F(1:nsh,2:end,k);
@@ -414,7 +451,7 @@ classdef dbt
             end
             Ffull = Ffull./sqrt(2);
             %Ffull = circshift(Ffull,-nsh);
-            if hilbert
+            if doHilbert
                 data = ifft(full(Ffull));
             else
                 data = real(ifft(full(Ffull)));
