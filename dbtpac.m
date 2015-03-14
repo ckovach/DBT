@@ -1,18 +1,23 @@
-function [xypac,amp,rmph] = dbtpac(X,Y,fs,varargin)
+function [xypac,dbamp,dbph] = dbtpac2(X,Y,fs,varargin)
 
-% out = dbtpac(x,y,fs,varargin)
+% out = dbtpac(x,y,fs,'phasebw',phbw,'ampbw',abw,varargin)
 % 
+% Efficiently computes phase-amplitude coupling, measured as LFP-amplitude 
+% coherence values, using the dbt transform.
 %
-% Efficiently computes phase-amplitude coupling with the dbt transform
-% Phase is computed from x and amplitude from y. Because the amplitdue 
-% component is necessarily sampled at a higher bandwidth, the result is
-% averaged over intervening steps. 
-
-
-% The output, out, is a struct with phase-amplitude coherence in the field out.PAC. 
-% out.PAC is a 4-d matrix with the result arranged as channel(amplitude) x
-% channel(phase) x amplitude bands x phase bands.
+% First, band-limited amplitude envelopes are computed from Y with the DBT at
+% bandwidth abw (default 40 Hz), then X is downsampled to the amplitude-band
+% sampling rate and amplitude-LFP coherence is calculated with DBTCOH at
+% bandwidth phasebw (defaults to 50 / T, where T is the duraion 
+% of the signal). 
 % 
+% The output, out, is a struct with phase-amplitude coherence in the field out.PAC. 
+% out.PAC is a 4-d matrix with the result arranged as channel(phase) x
+% channel(amplitude) x amplitude bands x phase bands.
+% 
+% See also DBTCOH, DBT
+
+
 % ----------- SVN REVISION INFO ------------------
 % $URL$
 % $Revision$
@@ -20,16 +25,29 @@ function [xypac,amp,rmph] = dbtpac(X,Y,fs,varargin)
 % $Author$
 % ------------------------------------------------
 
-phasebw = 2;
+phasebw = [];
 ampbw =40; 
-phaserange = [0.01 24];
-amprange = [40 300];
-phasefs=fs;
+phaserange = [0 24];
+amprange = [0 300];
+
 coherence = false; % compute coherence instead of PAC if true
 smwin = 0;
 anglehist = false;
 partial =  false;
 exclude_time = false;
+timerange = [];
+trigger= [];
+keep_time = [];
+phargs ={};
+get_trf = false;
+get_csd = false;
+trf = [];
+csd =[];
+% if nargin <3 && isa(X,'dbt')
+%     fs = X.fullFS;
+% end
+% phasefs=fs;
+
 i = 1;
 while i < length(varargin)
     
@@ -51,18 +69,28 @@ while i < length(varargin)
        case 'amp range'
            amprange = varargin{i+1};
            i = i+1;
-       case 'phasefs'
-           phasefs= varargin{i+1};
-           i = i+1;
+%        case 'phasefs'
+%            phasefs= varargin{i+1};
+%            i = i+1;
        case 'smwin'
            smwin= varargin{i+1};
            i = i+1;
          case 'partial'
            partial= varargin{i+1};
            i = i+1;
-         case 'exclude time'
-           exclude_time= varargin{i+1};
+         case 'keep time'
+           keep_time= varargin{i+1};
            i = i+1;
+         case {'transfer function','trf'}
+           get_trf= varargin{i+1};
+           i = i+1;
+         case {'csd','cross spectrum'}
+           get_csd= varargin{i+1};
+           i = i+1;
+        case {'trigger','timerange'}
+           phargs = [phargs,varargin(i:i+1)];
+           i = i+1;
+    
        otherwise
            error('Unrecognized keyword %s',varargin{i})
    end
@@ -71,164 +99,51 @@ end
 
 
     
-ampargs = {fs,ampbw,'padding','frequency','lowpass',amprange(2),'offset',amprange(1)};
-fprintf('\nAmplitude: %4i',0)
-% fprintf('\nAmplitude %4i',0)
-for i = 1:size(Y,2)
-    fprintf('\b\b\b\b%4i',i)
-    y = Y(:,i);
-    dbamp = dbt(y,ampargs{:});
-%     dbampdb = dbt(abs(dbamp.blrep),dbamp.sampling_rate,phasebw,'padding','frequency','lowpass',phaserange(2),'offset',phaserange(1));
-    a = zscore(bpfilt(abs(dbamp.blrep),[dbamp.sampling_rate phaserange ]));  
-    w = (0:size(a,1)-1)/size(a,1)*dbamp.sampling_rate;
-    Fa = fft(a);
-    Fa(w>phaserange(2)*2,:) = [];
-%     amp(:,i,:) = real(ifft(Fa));
-    amp(:,i,:) = ifft(Fa);
-    if i==1 && size(Y,2)>1
-        amp(end,size(Y,2),end) = 0;
-    end
-        
-end
-ampfs = size(Fa,1)./size(a,1)*dbamp.sampling_rate;
-ampt = (0:size(amp,1)-1)./ampfs;
+ampargs = {fs,ampbw,'padding','frequency','lowpass',min(amprange(2),fs/2),'offset',amprange(1)};
+dbamp = dbt(Y,ampargs{:}); %%% DBT from which band-limited amplitude will be obtained. 
+ampfs = dbamp.sampling_rate;
 
-%         fprintf('\b\b\b\b\b\b\b\b\b\b\b')
-%         fprintf('%0.4i<->%0.4i',i,k)
-
-    fprintf('\nPhase: %4i',0)
-phargs = {phasefs,phasebw,'padding','frequency','lowpass',phaserange(2),'offset',phaserange(1)};
-for k = 1:size(X,2);        
-       fprintf('\b\b\b\b%4i',k)
-
-        x = X(:,k);
-        dbph = dbt(x,phargs{:});
-
-
-        %Interpolate to amplitude sampling rate with sinc interpolation (i.e. padding the fft).
-        ph(:,k,:) = dbph.blrep;
-        if k==1 && size(X,2)>1
-            ph(end,size(X,2),end) = 0;
-        end 
-
-%          camp = 0;
-end
-if islogical(smwin)&&smwin 
-   smwin =  1/dbph.sampling_rate;
+if isempty(phasebw)
+    %%% If no other bandwidth is specified default to a reasonable value
+    %%% based on the amplitude bandwidth.
+   phasebw = ampbw/length(dbamp.time)*400; 
 end
 
-nx = size(X,2);
-ny= size(Y,2);
-nphbands = length(dbph.frequency);
-nsamp = length(ampt);
-nampbands = length(dbamp.frequency);
-
-
-%%% Match phase blrep to amplitude blrep sampling rate with sinc interp
-%%% (i.e. pad or trim the fft)
-F = fft(ph);
-F(nsamp,:,:,:) = 0;
-iph = ifft(F);
-
-if ~coherence
-   iph = iph./abs(iph);
-end
-
-%%% Construct remodulator to adjust phase to a correct value 
-%%% at the sampled time
-%rmf = dbph.bands(:,1)-dbph.shoulder/2*dbph.bandwidth;
-rmf = dbph.bands(:,1);
-
-remodulator = repmat(permute(exp(2*pi*1i*rmf*ampt)',[1 3 2]), [1 nx  1  ]);
-
-if ~isscalar(exclude_time)
-   ext = (0:length(exclude_time)-1)/fs;
-   gett = interp1(ext,double(exclude_time),ampt,'nearest')>0;
+if isempty(keep_time)
+    keepT = true(size(dbamp.time));
 else
-    gett = true(size(ampt));
+    keepT = resampi(keep_time,fs,ampfs,'linear')>.5;
 end
-%%% remodulate phase and reshape matrices
-rmph = iph.*conj(remodulator);
-% amp = zscore(amp);
-for i = 1:nampbands
-    fprintf('%4i',0)
-    
-    for k = 1:nphbands
-%         fprintf('%4i',k)
-        if partial
-            a = amp(:,:,i);
-%             p = rmph(:,:,k);
-            b =sum(a.*conj(rmph(:,:,k)))./sum(abs(rmph(:,:,k)).^2);
-            
-            a = a-rmph(:,:,k).*repmat(b,size(a,1),1);
-        else
-            a = amp(:,:,i);
-        end
-            
-        PAC(:,:,i,k) = corr(a(gett,:,:),rmph(gett,:,k));
+% Downsample data to match the DBT sampling rate for amplitude. 
+Xrs = resampi(X,fs,ampfs,'fft');
 
-        if i==1 && ny > 1
-            PAC(:,:,nampbands,nphbands)= 0;
-        end
-%         fprintf('\b\b\b\b')
+phargs = {phasebw,'padding','frequency','lowpass',min(phaserange(2),fs/2),'offset',phaserange(1),'keep time',keepT,phargs{:}};
+fprintf('\nBand: %4i',0)
+for k = 1:length(dbamp.frequency)   
+    fprintf('\b\b\b\b%4i',k)
+    if get_trf
+        [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:});
+    else
+        [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:});        
     end
-    
-    fprintf('\b\b\b\b')
-    
+    if get_csd
+        csd(:,:,k,:,:) = c;
+    end
 end
-% CM = rmph.*real(amp);
-% PAC(:,:,i,:) = squeeze(sum(CM)./sqrt(sum(abs(amp).^2).*sum(abs(rmph).^2)));
 
-if smwin > 0
-   %%% If cmwin is greater than zero, include a time-varying comodulogram in the output 
-   %%% To construct this, note that significant PAC implies that the
-   %%% phase component of one signal demodulates the other, hence we can
-   %%% low-pass filter to obtain a time-varying version of this. Here we
-   %%% will simply downsample to match dbph.
-        smwinN = round(smwin*dbamp.sampling_rate);
-           smw = zeros(size(amp,1),1);
-           smw(1:smwinN,:) = hanning(smwinN);
-           smw = circshift(smw,-floor(smwinN/2));
-           smw = smw./sum(smw);
-
-           fsmw = fft(smw);
-   for k = 1:size(amp,3)
-       for  kk = 1:size(rmph,3)
-           CM = repmat(amp(:,:,k),[1 1 size(rmph,2)]).*repmat(permute(conj(rmph(:,:,kk)),[1 3 2]),[1 size(amp,2) 1]);
- 
-           
-   
-           rp = size(CM);rp(1)=1;
-           FCM= fft(CM).*conj(repmat(fsmw,rp));
-           w = (0:nsamp-1)/nsamp*dbamp.sampling_rate;
-           FCM = FCM(1:length(dbph.time),:,:,:,:,:);
-
-           Famp = fft(abs(amp(:,:,k)).^2).*conj(repmat(fsmw,1,size(amp,2)));
-           Famp = Famp(1:length(dbph.time),:,:,:,:,:);
-
-           CMrs(:,:,:,k,kk) = ifft(FCM)./repmat(sqrt(abs(ifft(Famp))),[1 1 size(rmph,2)]);
-           if k==1 && kk == 1 && size(amp,3)>1 && size(rmph,3)>1
-               CMrs(:,:,:,size(amp,3),size(rmph,3)) = 0;
-           end
-       end
-   end
-   cmtime = ampt;
-else
-    CMrs = [];
-    cmtime = [];
-end
 fprintf('\b\b\b\b')
 
 xypac.PAC = PAC;
 % xypac.amp = amp;
 % xypac.ph = rmph;
-xypac.PACgram =CMrs;
+% xypac.PACgram =CMrs;
 xypac.ampfreq = dbamp.frequency';
-xypac.phfreq = dbph.frequency;
+xypac.phfreq = phfreq;
 xypac.fs = fs;
-xypac.cmtime= cmtime;
+% xypac.cmtime= cmtime;
 xypac.args.in = varargin;
 xypac.args.dbamp = ampargs;
 xypac.args.dbphase = phargs;
-
-
+xypac.tt = tt;
+xypac.trf = trf;
+xypac.csd = csd;
