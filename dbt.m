@@ -103,8 +103,8 @@ classdef dbt
                           %%% that the signal contains negative
                           %%% frequencies, which halves the number of
                           %%% samples.
-        direction = 'acausal'; %%% acausal (default), causal, or anti-causal                  
-    end
+        direction = 'acausal'; %%% acausal (default),quasi causal, or quasi anti-causal                  
+    end                       
     
     
     methods
@@ -267,7 +267,7 @@ classdef dbt
                switch me.direction
                 %%% Approximate causal or anti-causal filters while
                 %%% preserving summation properties of the tapers.
-                   
+                %%% Note that a truly causal filter cannot have a zero frequency response anywhere.   
                    case {'causal','anticausal'}
                        htptp = hilbert([tp,invtaper]);
                        htptp = htptp./abs(htptp);
@@ -351,10 +351,12 @@ classdef dbt
                 mult = 1;
             elseif islogical(columnfilter)
                 mult = diag(sparse(columnfilter));
-            elseif min(size(columnfilter)) == 1
+            elseif min(size(columnfilter)) == 1 && min(columnfilter)>=1
                 
                mult = diag(sparse( ismember(1:size(me.blrep,2),columnfilter)));
                
+            elseif min(size(columnfilter)) == 1
+                mult = diag(sparse(columnfilter));
             else
                 mult = columnfilter;
             end
