@@ -71,7 +71,8 @@ zhithresh = 6;
 zlothresh = 3;
 makeplots = false;
 smoothing_method = 'polynomial';
-%smoothing_method = 'moving_average';
+adjust_threshold = true; % If true this performs an initial denoising run at a higher threshold if an excessive number of frequency bands are rejected (>15 %)
+prefilter_threshold = 15; % Percent rejected bands needed to trigger prefiltering at a higher threshold
 smbw = 10;
 i = 1;
 while i <= length(varargin)
@@ -103,11 +104,11 @@ while i <= length(varargin)
                   varargin(i:i+1) = [];
                   i = i-1;
                 case {'zhithresh','high threshold'}  % coefficient threshold
-                  zthresh = varargin{i+1};
+                  zhithresh = varargin{i+1};
                   varargin(i:i+1) = [];
                   i = i-1;        
                 case {'zlothresh','low threshold'}  % Apply a lower threshold to frequencies above the kurtosis threshold
-                  zthresh = varargin{i+1};
+                  zlothresh = varargin{i+1};
                   varargin(i:i+1) = [];
                   i = i-1;        
                 case {'makeplots'} 
@@ -118,11 +119,16 @@ while i <= length(varargin)
                   smoothing_method = varargin{i+1};
                   varargin(i:i+1) = []; 
                   i = i-1;               
+  
                 case {'smoothing bandwidth'} 
                   %Bandwidth of moving average for 'moving average' method
                   smbw = varargin{i+1};
                   varargin(i:i+1) = []; 
                   i = i-1;               
+                case {'adjust threshold'} 
+                  adjust_threshold = varargin{i+1};
+                  varargin(i:i+1) = []; 
+                  i = i-1; 
                   
               otherwise
 %                  error('Unrecognized keyword %s',varargin{i})
@@ -159,6 +165,16 @@ w = blsig.frequency;
 
 kt = kurtosis(abs(blsig.blrep));
 
+pcntrej = mean(kt>kurtosis_threshold);
+F0=1;
+if adjust_threshold && pcntrej > prefilter_threshold/100;
+    fprintf('\n%0.0f%% bands flagged. Running a prefilter with higher rejection threshold.\n',pcntrej*100)
+    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,varargin{:},'low threshold',zhithresh,'adjust threshold',false);
+    kt = kurtosis(abs(blsig.blrep));
+
+end
+
+
 switch smoothing_method
     case 'polynomial'
         nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method); %takes out the baseline by fitting a polynomial
@@ -176,6 +192,7 @@ z = nzsc(mn);
 %%% exclude points that exceed a threshold from the score computation
 z(w<filter_above) = nan;
 z(kt>kurtosis_threshold) = nan;
+
 while any(abs(z)>zlothresh)
     
     z(abs(z)>zlothresh) = nan;
@@ -204,7 +221,7 @@ LN = isnan(P) & Z > zlothresh | Z >zhithresh ;
 % g = g./max(g);
 % LN = convn(LN,g./sum(g),'same');
 
-F = 1-LN;
+F = (1-LN).*F0;
 
 if makeplots
    [orig,bl] = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold); %takes out the baseline by fitting a polynomial
