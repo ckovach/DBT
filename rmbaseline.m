@@ -19,9 +19,9 @@ if nargin < 2 || isempty(usepts)
     usepts = true;
 end
  polyord = 8;
-if nargin < 2 &&  isnumeric(varargin{1})
+if nargin > 2 &&  isnumeric(varargin{1})
     polyord = varargin{1};
-else
+elseif nargin > 2 
     
     smoothing_method = varargin{1};
     if nargin < 4,
