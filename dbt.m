@@ -270,7 +270,7 @@ classdef dbt
                 %%% Note that a truly causal filter cannot have a zero frequency response anywhere.   
                    case {'causal','anticausal'}
                        htptp = hilbert([tp,invtaper]);
-                       htptp = htptp./abs(htptp);
+                       htptp = htptp./(abs(htptp)+eps);
                        if strcmp(me.direction,'causal')
                           htptp = conj(htptp);  
                        end
