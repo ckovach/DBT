@@ -396,7 +396,7 @@ classdef dbt
                    
                    case {'causal','anticausal'}
                        htptp = hilbert([tp,invtaper]);
-                       htptp = htptp./abs(htptp);
+                       htptp = htptp./(abs(htptp)+eps);
                        if strcmp(me.direction,'anticausal')
                           htptp = conj(htptp);  
                        end
