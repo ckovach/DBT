@@ -104,6 +104,11 @@ classdef dbt
                           %%% frequencies, which halves the number of
                           %%% samples.
         direction = 'acausal'; %%% acausal (default),quasi causal, or quasi anti-causal                  
+        remodphase = false; %%% If true, applies a phase correction equivalent 
+                            %%% to remodulating the subsampled data to the
+                            %%% original band. This is necessary to get a
+                            %%% correct average when averaging the spectrum
+                            %%% over time.
     end                       
     
     
@@ -151,6 +156,9 @@ classdef dbt
                       i = i+1;
                   case 'direction'
                       me.direction = varargin{i+1};
+                      i=i+1;
+                  case 'remodphase'
+                      me.remodphase = varargin{i+1};
                       i=i+1;
                   otherwise
                      error('Unrecognized keyword %s',varargin{i})
@@ -339,6 +347,16 @@ classdef dbt
            me.blrep(:,w>me.lowpass,:) = [];
            w(w>me.lowpass) = [];
            me.frequency = w;
+
+           if me.remodphase  
+               %%% This remodulates the signal to obtain the correct phase
+               %%% at a given frequency for the original band. It is necessary 
+               %%% when averaging the complex-valued spectrum over time so 
+               %%% that phase aligns correctly.
+               remodulator = exp(1i*2*pi*me.time*(me.frequency - (~me.centerDC)*me.bandwidth*(1+me.shoulder)/2));
+               me.blrep = me.blrep.*repmat(remodulator,[1 1 size(me.blrep,3)]);
+               
+           end
            
         end
 
@@ -368,6 +386,13 @@ classdef dbt
             n = me.fullN;
             noffset = round(me.offset./me.fullFS*n);
             ncol = size(me.blrep,3);
+           if me.remodphase  
+               %%% If phase remodulation was applied we need to reverse it.
+               demodulator = exp(-1i*2*pi*me.time*(me.frequency - (~me.centerDC)*me.bandwidth*(1+me.shoulder)/2));
+               me.blrep = me.blrep.*repmat(demodulator,[1 1 size(me.blrep,3)]);
+
+           end
+
             F = zeros(size(me.blrep));
             for k = 1:ncol
                 F(:,:,k) = fft(me.blrep(:,:,k) )*mult/sqrt(size(me.blrep,1)/2);         
