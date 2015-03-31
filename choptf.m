@@ -19,8 +19,15 @@ if nargin < 4
     nrm = 1;
 end
 
-[T,tt]= chopper(trg,times,db.sampling_rate);
+adjust_phase = db.remodphase; %Correct phase for rounding error
+                              %if phase information is preserved.
+                              
+[T,tt,Err]= chopper(trg,times,db.sampling_rate);
+
+Err(T<1|T>length(db.time)) = 0;
+
 T(T<1|T>length(db.time)) = length(db.time)+1;
+
 
 if ~isempty(trref)
 
@@ -41,7 +48,16 @@ for i = 1:nch
 %            nrm = repmat(mean(abs(x(Tref))),length(tt),1);
             nrm = repmat(exp(mean(log(abs(x(Tref))))),length(tt),1);
         end
+        
         CH(:,k,:,i) = x(T)./nrm;
     end
 
 end
+
+
+if adjust_phase
+    % This adjusts phase to compensate for rounding error
+    adjuster  = exp(-1i*2*pi*repmat(permute(Err,[1 3 2]),[1,length(db.frequency),1]).*repmat(db.frequency - (~db.centerDC)*db.bandwidth*(1+db.shoulder)/2,[length(tt) 1 size(T,2)]));
+    CH = CH.*repmat(adjuster,[1 1 1 size(CH,4)]);
+end
+
