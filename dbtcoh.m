@@ -1,7 +1,24 @@
 function [coh,csp,w,tt,dbs,trf,Pperm] =dbtcoh(x,y,varargin)
 
 
-% Simple function to compute coherence values with dbt transforms.
+% coh =dbtcoh(x,y,fs,bw)
+% Efficiently compute coherences values with dbt transforms. x and y are
+% input signals arranged time x channel. fs is sampling rate and bw is the
+% bandwidth within which to compute coherence.
+%
+% If x and y are dbt objects (see DBT), then fs and bw can be ommitted.
+%
+% [coh,csp,w] =dbtcoh(x,y,fs,bw)
+% Returns the cross-spectral matrix and vector of center frequencies for each band, w.
+%
+% [coh,csp,w,tt] =dbtcoh(x,y,fs,bw,'trigger',trig,'timerange',trange)
+%
+% Computes event-related coherence by averaging over windows specified by
+% trigger and timerange. Trigger is a vector of event times and time range
+% is a vector, trange = [startt endt], specificying window onset and end
+% relative to events in trig. tt is a vector sample times for the window.
+%
+
 
 % ----------- SVN REVISION INFO ------------------
 % $URL$

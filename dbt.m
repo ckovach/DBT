@@ -87,7 +87,7 @@ classdef dbt
         frequency = [];  % Center frequencies for the columns in blrep
         bands =[];     % Bands for the columns of blrep 
         fullN = 0;    % Length of the signal after padding
-        fullFS = 0;   % Sampling frequency of the reconstructed signal
+        fullFS = 0;   % Sampling frequency of the original signal
         Norig = 0;    % Original signal length before padding
         shoulder = 1; % Degree of frequency overlap between neighboring bands (0 - 1)
         lowpass = []; % Lowpass cutoff
@@ -101,7 +101,7 @@ classdef dbt
                           % samples.
                           
          bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
-        direction = 'acausal'; % acausal (default),quasi causal, or quasi anti-causal                  
+        direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = true; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary to get a
                             % correct average when averaging the spectrum
                             % over time.
