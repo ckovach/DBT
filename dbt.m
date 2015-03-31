@@ -153,7 +153,10 @@ classdef dbt
                   case 'remodphase'
                       me.remodphase = varargin{i+1};
                       i=i+1;
-                  otherwise
+                  case 'bwtol'
+                      me.bwtol = varargin{i+1};
+                      i=i+1;
+                   otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
               i = i+1;
