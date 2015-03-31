@@ -18,7 +18,7 @@ function [coh,csp,w,tt,dbs,trf,Pperm] =dbtcoh(x,y,varargin)
 % is a vector, trange = [startt endt], specificying window onset and end
 % relative to events in trig. tt is a vector sample times for the window.
 %
-
+% See also DBT
 
 % ----------- SVN REVISION INFO ------------------
 % $URL$
@@ -53,12 +53,7 @@ elseif nargin > 2 && isscalar(y) && isnumeric(y)
 end
                        
 while i <= length(varargin)
-     
-%     if isnumeric(varargin{i})
-%         dbtargs = [dbtargs,varargin{i}];
-%         i=i+1;
-%         continue
-%     end
+  
     
    switch varargin{i}
        
