@@ -68,7 +68,7 @@ classdef dbt
 %
 % See also TAPER, DBTCOH, DBTDENOISE, DBTPAC, STFT
 
-%     C Kovach 2013
+%     C Kovach 2013 - 2015
 % 
 % ----------- SVN REVISION INFO ------------------
 % $URL$
