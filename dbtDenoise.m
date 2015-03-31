@@ -127,6 +127,11 @@ while i <= length(varargin)
                   i = i-1;               
                 case {'adjust threshold'} 
                   adjust_threshold = varargin{i+1};
+                  if ~islogical(adjust_threshold)
+                      prefilter_threshold = adjust_threshold;
+                      adjust_threshold = true;
+                  end
+                  
                   varargin(i:i+1) = []; 
                   i = i-1; 
                   
