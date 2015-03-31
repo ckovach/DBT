@@ -1,4 +1,4 @@
-function [xypac,dbamp,dbph] = dbtpac2(X,Y,fs,varargin)
+function [xypac,dbamp,dbph] = dbtpac(X,Y,fs,varargin)
 
 % out = dbtpac(x,y,fs,'phasebw',phbw,'ampbw',abw,varargin)
 % 
@@ -30,19 +30,20 @@ ampbw =40;
 phaserange = [0 24];
 amprange = [0 300];
 
-coherence = false; % compute coherence instead of PAC if true
-smwin = 0;
-anglehist = false;
-partial =  false;
-exclude_time = false;
-timerange = [];
-trigger= [];
+% coherence = false; % compute coherence instead of PAC if true
+% smwin = 0;
+% anglehist = false;
+% partial =  false;
+% exclude_time = false;
+% timerange = [];
+% trigger= [];
 keep_time = [];
 phargs ={};
 get_trf = false;
 get_csd = false;
 trf = [];
 csd =[];
+cohargs = {};
 % if nargin <3 && isa(X,'dbt')
 %     fs = X.fullFS;
 % end
@@ -90,6 +91,9 @@ while i < length(varargin)
         case {'trigger','timerange'}
            phargs = [phargs,varargin(i:i+1)];
            i = i+1;
+        case {'center','subtract mean'}
+           cohargs = [cohargs,varargin(i:i+1)];
+           i = i+1;
     
        otherwise
            error('Unrecognized keyword %s',varargin{i})
@@ -122,9 +126,9 @@ fprintf('\nBand: %4i',0)
 for k = 1:length(dbamp.frequency)   
     fprintf('\b\b\b\b%4i',k)
     if get_trf
-        [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:});
+        [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});
     else
-        [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:});        
+        [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
     end
     if get_csd
         csd(:,:,k,:,:) = c;
