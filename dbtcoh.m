@@ -1,4 +1,4 @@
-function [coh,csp,w,tt,dbs,trf] =dbtcoh(x,y,varargin)
+function [coh,csp,w,tt,dbs,trf,Pperm] =dbtcoh(x,y,varargin)
 
 
 % Simple function to compute coherence values with dbt transforms.
@@ -11,19 +11,37 @@ function [coh,csp,w,tt,dbs,trf] =dbtcoh(x,y,varargin)
 % ------------------------------------------------
 
 i = 1;
-dbtargs = {};
 keep_time=[];
 trigger = [];
 timerange=[];
-tt=[];
+tt=0;
+subtract_mean = true; % Subtract the average as with an ordinary correlation.
+                       % This generally should make little difference on
+                       % simple coherence analyses but may be important for
+                       % event-related PAC.
+permtest = nargout>6; % Run a permutation test if true
+nperm = 1000; % number of permutations
 
+dbtargs = {'remodphase',subtract_mean};
+
+
+if nargin>3 && isnumeric(varargin{2}) && isnumeric(y)
+    fs = varargin{1};
+    bw = varargin{2};
+    varargin(1:2) =[];
+elseif nargin > 2 && isscalar(y) && isnumeric(y)
+    fs = y;
+    bw = varargin{1};
+    varargin(1) = [];
+end
+                       
 while i <= length(varargin)
      
-    if isnumeric(varargin{i})
-        dbtargs = [dbtargs,varargin{i}];
-        i=i+1;
-        continue
-    end
+%     if isnumeric(varargin{i})
+%         dbtargs = [dbtargs,varargin{i}];
+%         i=i+1;
+%         continue
+%     end
     
    switch varargin{i}
        
@@ -36,30 +54,33 @@ while i <= length(varargin)
        case 'timerange'
            timerange = varargin{i+1};
            i = i+1;
+       case {'subtract mean','center'}
+           subtract_mean = varargin{i+1};
+           dbtargs = [dbtargs,{'remodphase',subtract_mean}]; %#ok<*AGROW>
+           i = i+1;
        otherwise
-           dbtargs = [dbtargs,varargin(i:i+1)];
+           dbtargs = [dbtargs,varargin(i:i+1)]; 
            i=i+1;
    end
    
    i=i+1;
 end
 
+
 if ~isa(x,'dbt')
  
-    nx = size(x,2);    
+    nx = size(x,2);   
+    
 else
     dbx = x;
     nx = size(dbx.blrep,3);
 end
 
  dby = [];
-if isscalar(y) && ~isa(y,'dbt')
-    dbtargs = [{y},dbtargs];
-    y=[];
-    ny = nx;
-elseif ~isempty(y) 
+ 
+if ~isempty(y) && (~isscalar(y) || isa(y,'dbt')) 
     if ~isa(y,'dbt')
-        dby = dbt(y,dbtargs{:});
+        dby = dbt(y,fs,bw,dbtargs{:});
         ny = size(y,2);
     else
         dby = y;
@@ -70,13 +91,13 @@ else
 end
 
 if ~isa(x,'dbt')
-    dbx = dbt(x,dbtargs{:});
+    dbx = dbt(x,fs,bw,dbtargs{:});
 end
 
 if isempty(keep_time)
     keepT = true(size(dbx.time));
 else
-    keepT = resampi(keep_time,dbtargs{1},dbx.sampling_rate,'linear')>.5;
+    keepT = resampi(keep_time,fs,dbx.sampling_rate,'linear')>.5;
 end
 
 w = dbx.frequency;
@@ -91,51 +112,66 @@ if ~isempty(timerange)
    if ~isempty(y)
        [AY,tt] =  choptf(timerange,trigger,dby);
    end
+else
+    AX = dbx.blrep(keepT,:,:);
+    AY = dby.blrep(keepT,:,:);
 end
 
-for i = 1:length(dbx.frequency)
-        
-    if isempty(timerange)
-        blx = squeeze(dbx.blrep(keepT,i,:));
-        if isempty(y)
-            bly = blx;
-        else
-            bly = squeeze(dby.blrep(keepT,i,:));
-        end
-        csp(:,:,i) = blx'*bly;
-        if isempty(y)
-             coh(:,:,i) = diag(diag(csp(:,:,i).^-.5))*csp(:,:,i)*diag(diag(csp(:,:,i)).^-.5);
-        else          
-           coh(:,:,i) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i)*diag(sum(abs(bly).^2).^-.5);
-        end
-        if nargout > 4
-           trf(:,:,i) = diag(sum(abs(blx).^2))\(blx'*bly);
-          
-        end
 
-    else
-        
-        for t = 1:length(tt)
+for i = 1:length(dbx.frequency)
+    
+    
+    for t = 1:length(tt)
+        if isempty(timerange)
+            blx = squeeze(AX(:,i,:));
+            if isempty(y)
+                bly = blx;
+            else
+                bly = squeeze(AY(:,i,:));
+            end
+        else
             blx = squeeze(AX(t,i,:,:));
             if isempty(y)
                 bly = blx;
             else
                 bly = squeeze(AY(t,i,:,:));
             end
-        
-            csp(:,:,i,t) = blx'*bly;
-            if isempty(y)
-                 coh(:,:,i,t) = diag(diag(csp(:,:,i,t).^-.5))*csp(:,:,i,t)*diag(diag(csp(:,:,i,t)).^-.5);
-            else          
-               coh(:,:,i,t) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
-            end
-            if nargout > 4
-               trf(:,:,i,t) = diag(sum(abs(blx).^2))\(blx'*bly);
 
-            end
         end
+        csp(:,:,i,t) = blx'*bly;
+        
+        if permtest
+            nt = size(blx,1);
+            permN = 0;
+           for k = 1:nperm
+               rp = randperm(nt);
+               permN = permN + (abs(blx(rp,:)'*bly)>abs(csp(:,:,i,t))); %%% Permutes over time intervals.
+           end
+            Pperm(:,:,i,t) = permN./nperm;
+        else
+            Pperm = nan;
+        end
+        
+        if subtract_mean
+                 csp(:,:,i,t) = csp(:,:,i,t) - sum(blx)'*mean(bly);
+        end
+            
+        if isempty(y)
+             coh(:,:,i,t) = diag(diag(csp(:,:,i,t).^-.5))*csp(:,:,i,t)*diag(diag(csp(:,:,i,t)).^-.5);
+        else          
+           coh(:,:,i,t) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
+        end
+
+        if nargout > 4
+%             cblx = blx-repmat(mean(blx),size(blx,1),1);
+%             cbly = bly-repmat(mean(bly),size(bly,1),1);
+%            trf(:,:,i,t) = diag(sum(abs(blx).^2))\(blx'*bly);
+           trf(:,:,i,t) = diag(sum(abs(bly).^2))\(blx'*bly);
+        end
+
     end
 end
+
     
 if nargout > 4
     if isequal(x,y)
