@@ -79,47 +79,40 @@ classdef dbt
 
     properties 
         
-        blrep = [];  %%% Band-limited analytic representaiton of the signal (time x frequency band)
-        bandwidth = [];  %%% bandwidth parameter
-        sampling_rate = []; %%% Sampling rate after downsampling
-        offset = 0;	%%% Offset if the first band doesn't begin at 0 (a highpass cutoff)
-        time = [];     %%% Time points for the rows in blrep
-        frequency = [];  %%% Center frequencies for the columns in blrep
-        bands =[];     %%% Bands for the columns of blrep 
-        fullN = 0;    %%% Length of the signal after padding
-        fullFS = 0;   %%% Sampling frequency of the reconstructed signal
-        Norig = 0;    %%% Original signal length before padding
-        %nyqval = 0;   %%% fft value at the nyquist frequency
-        shoulder = 1; %%% Degree of frequency overlap between neighboring bands (0 - 1)
-        lowpass = []; %%% Lowpass cutoff
+        blrep = [];  % Band-limited analytic representaiton of the signal (time x frequency band)
+        bandwidth = [];  %The bandwidth parameter. This is the bandwidth not including the shoulders. Full bandwidth is BW*(1+shoulder)
+        sampling_rate = []; % Sampling rate after downsampling
+        offset = 0;	% Offset if the first band doesn't begin at 0 (a highpass cutoff)
+        time = [];     % Time points for the rows in blrep
+        frequency = [];  % Center frequencies for the columns in blrep
+        bands =[];     % Bands for the columns of blrep 
+        fullN = 0;    % Length of the signal after padding
+        fullFS = 0;   % Sampling frequency of the reconstructed signal
+        Norig = 0;    % Original signal length before padding
+        shoulder = 1; % Degree of frequency overlap between neighboring bands (0 - 1)
+        lowpass = []; % Lowpass cutoff
         taper = [];
-        padding = 'frequency';
-  		 fftpad = 0; % Additional padding to add to the fft as a proportion of unpadded length.
+    	 fftpad = 0; % Upsample each band by padding its fft by this proportion of the unpadded length.
         userdata=[];
-        centerDC = false; %%% If false, the pass band is demodulated 
-                          %%% so that 0 is the highpass limit, meaning that negative 
-                          %%% frequencies contain zero padding.
-                          %%% If true, the pass band is centered at 0, so
-                          %%% that the signal contains negative
-                          %%% frequencies, which halves the number of
-                          %%% samples.
-        direction = 'acausal'; %%% acausal (default),quasi causal, or quasi anti-causal                  
-        remodphase = false; %%% If true, applies a phase correction equivalent 
-                            %%% to remodulating the subsampled data to the
-                            %%% original band. This is necessary to get a
-                            %%% correct average when averaging the spectrum
-                            %%% over time.
-    end                       
-    
+        centerDC = false; % If true, bands are demodulated to [-bandwidth bandwidth], otherwise to [0 bandwidth] with zero padding to 2*bandwidth.
+                          % If true, the pass band is centered at 0, so
+                          % that the signal contains negative
+                          % frequencies, which halves the number of
+                          % samples.
+                          
+         bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
+        direction = 'acausal'; % acausal (default),quasi causal, or quasi anti-causal                  
+        remodphase = true; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary to get a
+                            % correct average when averaging the spectrum
+                            % over time.
+          padding = 'time'; % Options are 'time' or 'none'; 'frequency' is obsolete.
+    end    
     
     methods
     
         function me = dbt(varargin)
             
-%             padding = 'time';
             i = 4;       
-%             me.taperfun = @(x)x;
-%            me.taperfun = @(x)(1-cos(x*pi))/2; % Function that defines tapering in the overlapping regions of the window
             me.taper = taper; %#ok<CPROP>
             
            while i < length(varargin)
@@ -172,12 +165,8 @@ classdef dbt
            
            fs  = varargin{2};
            bw =  varargin{3};
-%            me.decim = decim;
-           
-           %bandwindows = 0:bw:fs/2-bw;
            
            fullsig  = varargin{1};
-           %nyq = bandwindows(end)+bw;
            
            n = size(fullsig,1);
            ncol = size(fullsig,2);
@@ -187,135 +176,109 @@ classdef dbt
            %Keeping signal duration fixed and allowing bandwidth and sampling
            %rate to vary.
            
-           T = n./fs; % signal duration
+           % T = n./fs; % old signal duration
            %%% K and M need to be integers
-           
-           M = ceil(bw*T);
-%            K = ceil(1/2*n./(T*bw) - 1/2*me.offset/bw); 
-           K = ceil(1/2*n./M - 1/2*me.offset/bw); 
-           newnf = 2*K*M;
-           newn = 2*ceil(newnf/2 + me.offset*newnf/(fs-2*me.offset));
-           noffset = (newn-newnf)/2;
             
-           switch me.padding
-               case 'time'
-                  T = newn./fs;
-                 fullsig(end+1:newn) = 0; 
-              
-                 
+           
+           switch lower(me.padding)
+               case {true,'time'}
+                   me.padding = 'time';
+                   % do nothing.              
                case 'frequency'
-                   
-                   
-           
+                   warning('Frequency padding option is obsolete. Using default time instead')
+                   me.padding = 'time';
+               case {'none',false}
+                   me.padding = 'none';
+                   me.bwtol = Inf;
            end
+                   
+            %%% Pad signal in time so that bandwidth is approximately
+            %%% divides padded duration duration
+            
+
+            [~,den] = rat(bw/fs/2,me.bwtol);
+
            
+           
+           newn = ceil(n/den)*den;
+           newT = newn/fs;
+           noffset = round((me.offset- me.shoulder*bw)*newT );
+           
+           winN = round(bw*newT);
+           newbw = winN/newT;
+           
+
            me.fullN = newn;
-           %%% Adjusting bandwidth based on new signal length 
-           newbw = 1/2*newnf/(T*K);           
-           %%% Likewise for new sampling frequency
-           newfs = newn./T;
-           me.fullFS = newfs;
+           me.fullFS = fs;
            
+           nnyq = ceil((newn+1)/2);
            if isempty(me.lowpass)
-              me.lowpass = newfs/2; 
+              me.lowpass = nnyq/newn*fs ; 
            end
            
-%            nwin = K+2;
-           winN = M;
-         
-%            noffset = floor(me.offset*newn/newfs);
-           me.offset = noffset*newfs/newn;
+           me.offset = noffset*fs/newn + newbw*me.shoulder;
            
-        
-           F = fft(fullsig./sqrt(n));
+           %%% Pad the signal
+           fullsig(end+1:newn,:) = 0;
            
-%            if strcmp(me.padding,'time')
-%                F(1,:) = F(1,:) + 1i*F(newn/2+1,:);
-%            end
-             me.bandwidth = newbw;
-%            if me.shoulder ~=0
-               me.bands(:,1) = (me.offset-newbw*(1+me.shoulder)/2:newbw:me.lowpass-newbw*(1+me.shoulder)/2);%-newfs/newn;
-               me.bands(:,2) = me.bands(:,1)+newbw*(1+me.shoulder);%+newfs/newn;
-% %               me.bands([1 end],2) = me.bands([1 end],1)+newbw*me.shoulder/2;
-%            else
-%                me.bands = [me.offset :newbw:me.lowpass-newbw;...
-%                            (me.offset + newbw) :newbw:me.lowpass ]';
-%                
-%            end
+           F = fft(fullsig./sqrt(newn));
+           
+           me.bandwidth = newbw;
+           me.bands(:,1) = (me.offset-newbw*(1+me.shoulder)/2:newbw:me.lowpass-newbw*(1-me.shoulder)/2);%-newfs/newn;
+           me.bands(:,2) = me.bands(:,1)+newbw*(1+me.shoulder);%+newfs/newn;
            nwin =size(me.bands,1);
-           newF = zeros(newn,ncol);           
-           oldn =size(F,1);
-           %newF(1:oldn,:) = F(1:oldn,:);
-           indx = -floor(oldn/2):ceil((oldn+1)/2);
-           newF(mod(indx,newn)+1,:) = F(mod(indx,oldn)+1,:);
-           
-%            if me.shoulder == 0
-% %                nwin = nwin-2;
-%                 nwin = K;
-%                Frs = reshape(newF(noffset+1:newn/2,:),winN,nwin,ncol);
-%            else
-              
-               nsh = min(ceil(me.shoulder*newbw./newfs*newn),winN);
-               me.shoulder = nsh*newfs./newn./newbw;
-               
-               %%% Reshaping matrix. This step includes the initial
-               %%% circular shift.
-%               rsmat = noffset + repmat((-1:nwin-2)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);
-            %   rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin) - floor(winN/2);
-               rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin) -nsh;
-               rsmat = mod(rsmat-1,newn)+1;
-               
-               
-              % rsmat = rsmat(:,[1, 1:end,end]);
-%                tp = me.taper.make((1:1:nsh)/nsh); 
-%                invtaper = me.taper.make(1-(1:1:nsh)/nsh);
-                tp = me.taper.make((0:1:nsh-1)/nsh); 
-                invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
-                
-               switch me.direction
-                %%% Approximate causal or anti-causal filters while
-                %%% preserving summation properties of the tapers.
-                %%% Note that a truly causal filter cannot have a zero frequency response anywhere.   
-                   case {'causal','anticausal'}
-                       htptp = hilbert([tp,invtaper]);
-                       htptp = htptp./(abs(htptp)+eps);
-                       if strcmp(me.direction,'causal')
-                          htptp = conj(htptp);  
-                       end
-                       tp = htptp(1:length(tp)).*tp;
-                       invtaper = htptp(length(tp)+(1:length(invtaper))).*invtaper;                       
-                   case 'acausal'
-                       % do nothing
-                   otherwise
-                       error('Unrecognized filter direction, %s.',me.direction)
-               end
-                   
-               Frs = zeros([size(rsmat),ncol]);
-               for  k = 1:ncol
-                    f = newF(:,k);
-                   Frs(:,:,k) = double(f(rsmat));
-%                    Frs(1:nsh,end,k) = diag(sparse(invtaper))*Frs(end-nsh+1:end,end,k);
-%                    Frs(1:nsh,1,k) = diag(sparse(tp))*Frs(1:nsh,1,k);
-                   if nsh>0
-                        Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
 
-                       Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
+           nsh = min(ceil(me.shoulder*newbw./fs*newn),winN);
+           me.shoulder = nsh*fs./newn./newbw;
+
+           %%% Reshaping matrix. This step includes the initial
+           %%% circular shift.
+           rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);% -nsh;
+           rsmat = mod(rsmat-1,newn)+1;
+
+
+             tp = me.taper.make((0:1:nsh-1)/nsh); 
+            invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+
+           switch me.direction
+            %%% Approximate causal or anti-causal filters while
+            %%% preserving summation properties of the tapers.
+            %%% Note that a truly causal filter cannot have a zero frequency response anywhere.   
+               case {'causal','anticausal'}
+                   htptp = hilbert([tp,invtaper]);
+                   htptp = htptp./(abs(htptp)+eps);
+                   if strcmp(me.direction,'causal')
+                      htptp = conj(htptp);  
                    end
-                   winN = size(Frs,1);
-                   % Frs(:,1) = Frs(:,1)/sqrt(2);
-%                    Frs(ceil(end/2):end,end) = 0;
+                   tp = htptp(1:length(tp)).*tp;
+                   invtaper = htptp(length(tp)+(1:length(invtaper))).*invtaper;                       
+               case 'acausal'
+                   % do nothing
+               otherwise
+                   error('Unrecognized filter direction, %s.',me.direction)
+           end
 
-                    %%% Set all negative frequencies to zero
-                    Frs(rsmat(:, end)>ceil((newn+1)/2),end,k)=0;
-                    Frs(rsmat(:, 1)>ceil((newn+1)/2),1,k)=0;
-                    
-                    %%% Corrections for DC and Nyquist to preserve power
-                    %%% after zeroing negative frequencies
-                    Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
-                    Frs(rsmat(:,end)==newn/2+1,end,k) = Frs(rsmat(:,end)==newn/2+1,end,k)/sqrt(2); %% Nyquist adjusted for even length  
+           Frs = zeros([size(rsmat),ncol]);
+           for  k = 1:ncol
+                f = F(:,k);
+               Frs(:,:,k) = double(f(rsmat));
+               if nsh>0
+                    Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
+
+                   Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
                end
-%            end
-           padN = floor((me.fftpad+1)*winN*(1+~me.centerDC));
+
+                %%% Set all negative frequencies to zero
+%                     Frs(rsmat(:, end-1:end)>ceil((newn+1)/2),end,k)=0;
+%                     Frs(rsmat(:, 1:2)>ceil((newn+1)/2),1,k)=0;
+
+                %%% Corrections for DC and Nyquist to preserve power
+                %%% after zeroing negative frequencies
+                Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
+
+           end
+
+           padN = floor((me.fftpad+1)*winN*(1+~me.centerDC))*(1+me.shoulder);
            me.fftpad = padN/winN/(1+~me.centerDC)-1;
            
            if padN > winN
@@ -324,28 +287,23 @@ classdef dbt
                padN = winN;
                me.fftpad = 0;
            end
-%            me.nyqval = newF(newn/2+1,:);
+           
            if me.centerDC
-%                Frs = fftshift(Frs,1);
                Frs = circshift(Frs,-ceil(winN/2));
                me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2);
            else
-%                Frs(winN*2,:,:) = 0;
+
                me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2);
            end
            
                
-            me.sampling_rate = padN/T;
+            me.sampling_rate = padN/newT;
                  
          
-%            me.bands(1,1) = me.offset;
-%            me.bands(end,2) = me.lowpass;
-           me.time = (((1:size(me.blrep,1))-1)*T./size(me.blrep,1))';
-%            w = ((0:K-2)+.5 + me.shoulder/2)*newbw + me.offset; 
-%            w = [me.shoulder/2*newbw, w, me.lowpass-me.shoulder/2*newbw];
+           me.time = (((1:size(me.blrep,1))-1)*newT./size(me.blrep,1))';
            w = mean(me.bands,2)';
-           me.blrep(:,w>me.lowpass,:) = [];
-           w(w>me.lowpass) = [];
+           me.blrep(:,w > me.lowpass + me.shoulder*bw,:) = [];
+           w(w > me.lowpass + me.shoulder*bw) = [];
            me.frequency = w;
 
            if me.remodphase  
@@ -362,9 +320,27 @@ classdef dbt
 
         %%%%
 
-        function [data,fs] = signal(me,columnfilter,doHilbert)
+        function [data,fs] = signal(me,columnfilter,doHilbert,return_padded)
             
-            %%% Reconstruct the signal from its band-limited analytic representation
+            % db.signal
+            % Reconstruct the signal from its band-limited analytic
+            % representation by applying the inverse DBT. 
+            %
+            % db.signal(bands)
+            %
+            % Reconstruct the signal using only the specified bands. 'bands
+            % may be a numeric or logical index. 
+            % Example: 
+            %        db.signal(db.frequency > 100)
+            % returns the signalusing only bands with center frequency above 100 Hz.
+            %
+            % db.signal(bands,true)
+            %
+            % Returns a complex-valued analytic signal with negative frequencies zero'd. 
+            %
+            
+            
+            
             if nargin < 2 || isempty(columnfilter)
                 mult = 1;
             elseif islogical(columnfilter)
@@ -382,9 +358,11 @@ classdef dbt
             if nargin < 3 || isempty(doHilbert)
                doHilbert = false; 
             end
-            
+            if nargin < 4 || isempty(return_padded)
+               return_padded = false; 
+            end
             n = me.fullN;
-            noffset = round(me.offset./me.fullFS*n);
+            noffset = round((me.offset-me.bandwidth*me.shoulder)./me.fullFS*n);
             ncol = size(me.blrep,3);
            if me.remodphase  
                %%% If phase remodulation was applied we need to reverse it.
@@ -401,14 +379,11 @@ classdef dbt
             padN = length(me.time);
             winN = round(padN./(1+me.fftpad)/(1+~me.centerDC)); 
             if me.centerDC
-%                 nnyq = size(F,1);
-                F = circshift(F,ceil(winN/2));%sqrt(2);
+               
+                F = circshift(F,winN);%sqrt(2);
                 
-%                 F = ifftshift(F,1)*sqrt(2);
-%             else
-               % nnyq = ceil((size(F,1)+1)/2);
             end
-            F = F(1:winN,:,:)*sqrt(2);
+            F = F(1:2*winN,:,:)*sqrt(2);
 
              nnyq = size(F,1);
             if nsh >0
@@ -434,56 +409,46 @@ classdef dbt
                 end
                
                 for k = 1:ncol
-%                     sh = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k);
                     sh = diag(sparse(invtaper))*F(1:nsh,2:end,k);
                     
-%                     F(1:nsh,2:end,k) = diag(sparse(invtaper))*F(1:nsh,2:end,k)+sh;
                     F(nnyq-nsh+1:nnyq,1:end-1,k) = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k)+sh;
                 end
-                  %  F(:,1,:) = [];
                  
+            else
+                invtaper = 1;
             end
-%             F(nnyq-nsh+1:end,:,:) = [];
+            
+                %%% Retain the leading edge if there is an offset
+               F0 = squeeze(F(1:nsh,1,:)).*invtaper'; 
+            
             F(1:nsh,:,:)=[];
             Ffull = zeros(me.fullN,ncol);
             switch me.padding
                 case {'frequency','fft'}
-                    for k = 1:ncol
-                      f = F(:,:,k);
-
-                       Ffull(mod(noffset+(1:numel(f))-floor(winN/2)-1+winN/2,me.fullN)+1,k) = f(:)*sqrt(me.Norig);
-                       %Ffull(floor(me.Norig/2+.5)+1,k) = Ffull(floor(me.Norig/2+.5)+1,k)/2; 
-                       Ffull(ceil(me.Norig/2+.5)+1:me.Norig,k) = 0; 
-                        
-                       if ~mod(me.fullN,2)
-                            Ffull(me.fullN/2+1,k) = Ffull(me.fullN/2+1,k)/sqrt(2);
-                       end
-                       Ffull(1,k) = real(Ffull(1,k))/sqrt(2);
-                    end
-                    
-                    Ffull(me.Norig+1:end,:) = []; 
-
-%                     Ffull(ceil(me.Norig/2)+1) = imag(Ffull(1))/2;
-%                     Ffull(1) = real(Ffull(1))/2;
-                 case 'time'
-                    for k = 1:ncol
-                        f = F(:,:,k);
-                       Ffull(mod(noffset+(1:numel(f))-floor(winN/2)-1+winN/2,me.fullN)+1,k) = f(:)*sqrt(me.Norig);
-%                         Ffull(mod(noffset+(1:numel(f))-floor(winN/2),me.fullN)+1,k) = f(:)*sqrt(me.fullN);
-
-                        Ffull(ceil(me.fullN/2+1),k) = Ffull(ceil(me.fullN/2+1),k)/sqrt(2);
-                        Ffull(1,k) = real(Ffull(1,k))/sqrt(2);
-%                         Ffull(me.fullN,k) = 0;
-                    end
+                    warning('Frequency padding is an obsolete option.')
             end
+
+            for k = 1:ncol
+                f = F(:,:,k);
+  
+                Ffull( 1 + mod(noffset+(1:numel(f)+size(F0,1))-1,me.fullN),k) = [F0(:,k);f(:)] * sqrt(me.fullN);
+
+               if ~mod(me.fullN,2)
+                  Ffull(ceil(me.fullN/2+1),k) = Ffull(ceil(me.fullN/2+1),k)/2;
+               end
+               Ffull(1,k) = real(Ffull(1,k))/sqrt(2);
+            end
+            Ffull(ceil((me.fullN+1)/2)+1:end,:,:) = 0;
+            
             Ffull = Ffull./sqrt(2);
-            %Ffull = circshift(Ffull,-nsh);
-            if doHilbert
+            if doHilbert %%% If second argument is true return analytic signal
                 data = ifft(full(Ffull));
             else
                 data = real(ifft(full(Ffull)));
             end
-            data = data(1:me.Norig,:);
+            if ~return_padded
+                data = data(1:me.Norig,:);
+            end
             fs = me.fullFS;
             
         end
