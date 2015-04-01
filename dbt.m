@@ -422,7 +422,7 @@ classdef dbt
             end
             
                 %%% Retain the leading edge if there is an offset
-               F0 = squeeze(F(1:nsh,1,:)).*invtaper'; 
+               F0 = squeeze(F(1:nsh,1,:)).*repmat(invtaper',1,ncol); 
             
             F(1:nsh,:,:)=[];
             Ffull = zeros(me.fullN,ncol);
