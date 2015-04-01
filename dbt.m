@@ -281,7 +281,7 @@ classdef dbt
 
            end
 
-           padN = floor((me.fftpad+1)*winN*(1+~me.centerDC))*(1+me.shoulder);
+           padN = floor((me.fftpad+1)*winN*(1+~me.centerDC)*(1+me.shoulder));
            me.fftpad = padN/winN/(1+~me.centerDC)-1;
            
            if padN > winN
