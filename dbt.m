@@ -131,10 +131,10 @@ classdef dbt
                       i = i+1;
                   case 'shoulder'
                       me.shoulder = varargin{i+1};
-                      if me.shoulder ~=1
-                          me.shoulder = 1;
-                          warning(sprintf('\n!!!!!!!!!!\nMPORTANT MESSAGE: Due to a bug, shoulder is forced to be 1. This will be fixed in a future revision.\n!!!!!!!!!!'))
-                      end
+%                       if me.shoulder ~=1
+%                           me.shoulder = 1;
+%                           warning(sprintf('\n!!!!!!!!!!\nMPORTANT MESSAGE: Due to a bug, shoulder is forced to be 1. This will be fixed in a future revision.\n!!!!!!!!!!'))
+%                       end
                       i = i+1;
                   case 'lowpass'
                       me.lowpass = varargin{i+1};
@@ -390,7 +390,7 @@ classdef dbt
                 F = circshift(F,winN);%sqrt(2);
                 
             end
-            F = F(1:2*winN,:,:)*sqrt(2);
+            F = F(1:(1+me.shoulder)*winN,:,:)*sqrt(2);
 
              nnyq = size(F,1);
             if nsh >0
