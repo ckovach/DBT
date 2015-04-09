@@ -296,7 +296,7 @@ classdef dbt
            end
            
            if me.centerDC
-               Frs = circshift(Frs,-ceil(winN/2));
+               Frs = circshift(Frs,-ceil(winN));
                me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2);
            else
 
