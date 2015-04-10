@@ -107,7 +107,11 @@ if ~isa(x,'dbt')
 end
 
 if isempty(keep_time)
-    keepT = true(size(dbx.time));
+   % keepT = true(size(dbx.time));
+   keepT = dbx.time < dbx.Norig/dbx.fullFS;
+
+elseif isa(x,'dbt')
+    keepT = keep_time;
 else
     keepT = resampi(keep_time,fs,dbx.sampling_rate,'linear')>.5;
 end
