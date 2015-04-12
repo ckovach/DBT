@@ -289,10 +289,10 @@ classdef dbt
            padN = floor((me.fftpad+1)*winN*(1+~me.centerDC)*(1+me.shoulder));
            me.fftpad = 1/(1+me.shoulder)*padN/winN/(1+~me.centerDC)-1;
            
-           if padN > winN*(1+me.shoulder)
+           if padN > round(winN*(1+me.shoulder))
                Frs(padN,:,:) = 0;
-           elseif padN < (1+me.shoulder)*winN
-               padN = (1+me.shoulder)*winN;
+           elseif padN < round((1+me.shoulder)*winN)
+               padN =round( (1+me.shoulder)*winN);
                me.fftpad = 0;
            end
            
@@ -391,7 +391,7 @@ classdef dbt
                 F = circshift(F,ceil(winN/2*(1+me.shoulder)));%sqrt(2);
                 
             end
-            F = F(1:winN*(1+me.shoulder),:,:)*sqrt(2);
+            F = F(1:round(winN*(1+me.shoulder)),:,:)*sqrt(2);
 
              nnyq = size(F,1);
             if nsh >0
