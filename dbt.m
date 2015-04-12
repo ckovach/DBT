@@ -209,7 +209,6 @@ classdef dbt
            
            newn = ceil(n/den)*den;
            newT = newn/fs;
-           noffset = round((me.offset- me.shoulder*bw)*newT );
            
            winN = round(bw*newT);
            newbw = winN/newT;
@@ -223,7 +222,6 @@ classdef dbt
               me.lowpass = nnyq/newn*fs ; 
            end
            
-           me.offset = noffset*fs/newn + newbw*me.shoulder;
            
            %%% Pad the signal
            fullsig(end+1:newn,:) = 0;
@@ -231,12 +229,15 @@ classdef dbt
            F = fft(fullsig./sqrt(newn));
            
            me.bandwidth = newbw;
+           
+           nsh = min(ceil(me.shoulder*newbw./fs*newn),winN);
+           me.shoulder = nsh*fs./newn./newbw;
+           
+           noffset = round(me.offset*newT -nsh );
+           me.offset = noffset*fs/newn + newbw*me.shoulder;
            me.bands(:,1) = (me.offset-newbw*(1+me.shoulder)/2:newbw:me.lowpass-newbw*(1-me.shoulder)/2);%-newfs/newn;
            me.bands(:,2) = me.bands(:,1)+newbw*(1+me.shoulder);%+newfs/newn;
            nwin =size(me.bands,1);
-
-           nsh = min(ceil(me.shoulder*newbw./fs*newn),winN);
-           me.shoulder = nsh*fs./newn./newbw;
 
            %%% Reshaping matrix. This step includes the initial
            %%% circular shift.
