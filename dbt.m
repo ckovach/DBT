@@ -241,7 +241,7 @@ classdef dbt
 
            %%% Reshaping matrix. This step includes the initial
            %%% circular shift.
-           rsmat = noffset + repmat((0:nwin-1)*(winN),winN*(1+me.shoulder),1) + repmat((1:winN*(1+me.shoulder))',1,nwin);% -nsh;
+           rsmat = noffset + repmat((0:nwin-1)*(winN),round(winN*(1+me.shoulder)),1) + repmat((1:round(winN*(1+me.shoulder)))',1,nwin);% -nsh;
            rsmat = mod(rsmat-1,newn)+1;
 
 
