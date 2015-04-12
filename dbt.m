@@ -240,7 +240,7 @@ classdef dbt
 
            %%% Reshaping matrix. This step includes the initial
            %%% circular shift.
-           rsmat = noffset + repmat((0:nwin-1)*(winN),winN+nsh,1) + repmat((1:winN+nsh)',1,nwin);% -nsh;
+           rsmat = noffset + repmat((0:nwin-1)*(winN),winN*(1+me.shoulder),1) + repmat((1:winN*(1+me.shoulder))',1,nwin);% -nsh;
            rsmat = mod(rsmat-1,newn)+1;
 
 
@@ -286,17 +286,17 @@ classdef dbt
            end
 
            padN = floor((me.fftpad+1)*winN*(1+~me.centerDC)*(1+me.shoulder));
-           me.fftpad = 1/2*padN/winN/(1+~me.centerDC)-1;
+           me.fftpad = 1/(1+me.shoulder)*padN/winN/(1+~me.centerDC)-1;
            
-           if padN > winN*2
+           if padN > winN*(1+me.shoulder)
                Frs(padN,:,:) = 0;
-           elseif padN < 2*winN
-               padN = winN;
+           elseif padN < (1+me.shoulder)*winN
+               padN = (1+me.shoulder)*winN;
                me.fftpad = 0;
            end
            
            if me.centerDC
-               Frs = circshift(Frs,-ceil(winN));
+               Frs = circshift(Frs,-ceil(winN/2*(1+me.shoulder)));
                me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2);
            else
 
@@ -384,13 +384,13 @@ classdef dbt
             end
             nsh = round(me.shoulder*me.bandwidth./me.fullFS*me.fullN);
             padN = length(me.time);
-            winN = 1/2*round(padN./(1+me.fftpad)/(1+~me.centerDC)); 
+            winN = round(padN./(1+me.fftpad)/(1+~me.centerDC)/(1+me.shoulder)); 
             if me.centerDC
                
-                F = circshift(F,winN);%sqrt(2);
+                F = circshift(F,ceil(winN/2*(1+me.shoulder)));%sqrt(2);
                 
             end
-            F = F(1:(1+me.shoulder)*winN,:,:)*sqrt(2);
+            F = F(1:winN*(1+me.shoulder),:,:)*sqrt(2);
 
              nnyq = size(F,1);
             if nsh >0
