@@ -286,11 +286,11 @@ classdef dbt
            end
 
            padN = floor((me.fftpad+1)*winN*(1+~me.centerDC)*(1+me.shoulder));
-           me.fftpad = padN/winN/(1+~me.centerDC)-1;
+           me.fftpad = 1/2*padN/winN/(1+~me.centerDC)-1;
            
-           if padN > winN
+           if padN > winN*2
                Frs(padN,:,:) = 0;
-           elseif padN < winN
+           elseif padN < 2*winN
                padN = winN;
                me.fftpad = 0;
            end
@@ -384,7 +384,7 @@ classdef dbt
             end
             nsh = round(me.shoulder*me.bandwidth./me.fullFS*me.fullN);
             padN = length(me.time);
-            winN = round(padN./(1+me.fftpad)/(1+~me.centerDC)); 
+            winN = 1/2*round(padN./(1+me.fftpad)/(1+~me.centerDC)); 
             if me.centerDC
                
                 F = circshift(F,winN);%sqrt(2);
