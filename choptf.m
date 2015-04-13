@@ -7,7 +7,7 @@ function [CH,tt,T] = choptf(trg,times,db,trref)
 % evnt_times - event markers
 % db - dbt object
 % trref - reference range by which to normalize. Normalization is currently
-%         mean amplitude envelope within the reference period applied to 
+%         geometric mean amplitude envelope within the reference period applied to 
 %         each corresponding trial epoch.
 %         For no normalization leave empty (default)
 % see also DBT
