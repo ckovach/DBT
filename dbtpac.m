@@ -103,7 +103,7 @@ end
 
 
     
-ampargs = {fs,ampbw,'padding','frequency','lowpass',min(amprange(2),fs/2),'offset',amprange(1)};
+ampargs = {fs,ampbw,'padding','time','lowpass',min(amprange(2),fs/2),'offset',amprange(1)};
 dbamp = dbt(Y,ampargs{:}); %%% DBT from which band-limited amplitude will be obtained. 
 ampfs = dbamp.sampling_rate;
 
@@ -121,7 +121,7 @@ end
 % Downsample data to match the DBT sampling rate for amplitude. 
 Xrs = resampi(X,fs,ampfs,'fft');
 
-phargs = {phasebw,'padding','frequency','lowpass',min(phaserange(2),fs/2),'offset',phaserange(1),'keep time',keepT,phargs{:}};
+phargs = {phasebw,'padding','time','lowpass',min(phaserange(2),fs/2),'offset',phaserange(1),'keep time',keepT,phargs{:}};
 fprintf('\nBand: %4i',0)
 for k = 1:length(dbamp.frequency)   
     fprintf('\b\b\b\b%4i',k)
