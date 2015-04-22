@@ -228,10 +228,10 @@ LN = isnan(P) & Z > zlothresh | Z >zhithresh ;
 
 F = (1-LN).*F0;
 
-if makeplots
-   [orig,bl] = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold); %takes out the baseline by fitting a polynomial
-   orig = 20*log10(abs(nanmean(abs(orig).^2)))';
-end
+% if makeplots
+%    [orig,bl] = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold); %takes out the baseline by fitting a polynomial
+%    orig = 10*log10(abs(nanmean(abs(orig).^2)))';
+% end
 
 blsig.blrep = blsig.blrep.*F;
 
@@ -241,15 +241,17 @@ xdn = xdn(1:length(x));
 
 
 if makeplots
-   dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
-   pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
+%    dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
+%    pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
+   dnnsig = blsig.blrep; 
+   pl = plot(blsig.frequency,100*(1-mean(F)));
    set(pl(1),'color','r');
-   set(pl(2),'color','b');
+%    set(pl(2),'color','b');
    xlabel('Freq (hz)')
-   ylabel('dB');
+   ylabel('% Discarded');
    grid on
-   legend({'Baseline normalized power','After denoising'})
-   xlim([filter_above 800])
+%    legend({'Baseline normalized power','After denoising'})
+   xlim([blsig.frequency(1) blsig.frequency(end)])
 end
 
 
