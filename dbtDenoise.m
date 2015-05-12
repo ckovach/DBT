@@ -73,6 +73,7 @@ makeplots = false;
 smoothing_method = 'polynomial';
 adjust_threshold = true; % If true this performs an initial denoising run at a higher threshold if an excessive number of frequency bands are rejected (>15 %)
 prefilter_threshold = 15; % Percent rejected bands needed to trigger prefiltering at a higher threshold
+baseline_polyord = 10;
 smbw = 10;
 i = 1;
 while i <= length(varargin)
@@ -90,7 +91,7 @@ while i <= length(varargin)
                   kurtosis_threshold = varargin{i+1};
                   varargin(i:i+1) = [];
                   i = i-1;
-               case {'filter above'}  % use stft instead of dbt
+               case {'filter above'}  % ONly apply filter above this frequency
                   
                   filter_above = varargin{i+1};
                   varargin(i:i+1) = [];
@@ -123,6 +124,10 @@ while i <= length(varargin)
                 case {'smoothing bandwidth'} 
                   %Bandwidth of moving average for 'moving average' method
                   smbw = varargin{i+1};
+                  varargin(i:i+1) = []; 
+                  i = i-1;               
+                case {'smoothing polyord'} 
+                  baseline_polyord = varargin{i+1};
                   varargin(i:i+1) = []; 
                   i = i-1;               
                 case {'adjust threshold'} 
@@ -173,8 +178,8 @@ kt = kurtosis(abs(blsig.blrep));
 pcntrej = mean(kt>kurtosis_threshold);
 F0=1;
 if adjust_threshold && pcntrej > prefilter_threshold/100;
-    fprintf('\n%0.0f%% bands flagged. Running a prefilter with higher rejection threshold.\n',pcntrej*100)
-    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,varargin{:},'low threshold',zhithresh,'adjust threshold',false);
+    fprintf('\n%0.0f%% bands flagged. Prefiltering with higher rejection threshold.\n    ',pcntrej*100)
+    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,varargin{:},'low threshold',2*zlothresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold);
     kt = kurtosis(abs(blsig.blrep));
 
 end
@@ -182,7 +187,7 @@ end
 
 switch smoothing_method
     case 'polynomial'
-        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method); %takes out the baseline by fitting a polynomial
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,baseline_polyord); %takes out the baseline by fitting a polynomial
     case 'moving_average'
         nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw); %takes out the baseline by fitting a polynomial
         
@@ -244,13 +249,20 @@ if makeplots
 %    dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
 %    pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
    dnnsig = blsig.blrep; 
-   pl = plot(blsig.frequency,100*(1-mean(F)));
+   pl = plot(blsig.frequency,100*(1-mean(F))');
+   if ~isequal(F0,1)
+        hold on
+        pl(2) = plot(blsig.frequency,100*(1-mean(F0))');
+        set(pl(2),'color','b');
+        hold off
+        
+        legend({'Final','First pass'})
+   end
+       
    set(pl(1),'color','r');
-%    set(pl(2),'color','b');
    xlabel('Freq (hz)')
    ylabel('% Discarded');
    grid on
-%    legend({'Baseline normalized power','After denoising'})
    xlim([blsig.frequency(1) blsig.frequency(end)])
 end
 
