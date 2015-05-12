@@ -24,10 +24,17 @@ if nargin > 2 &&  isnumeric(varargin{1})
 elseif nargin > 2 
     
     smoothing_method = varargin{1};
-    if nargin < 4,
-        smoothbw = 10;
-    else
-        smoothbw = varargin{2};
+    switch smoothing_method
+        case 'moving_average'
+            if nargin < 4,
+                smoothbw = 10;
+            else
+                smoothbw = varargin{2};
+            end
+        case 'polynomial'
+            if nargin >= 4,            
+                polyord = varargin{2};
+            end
     end
 end
 
