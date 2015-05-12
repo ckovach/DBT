@@ -475,6 +475,7 @@ classdef dbt
             w = me.frequency;
             if nargout == 0
                imagesc(t,w,S) 
+               axis xy
             else
                 varargout(1:3) = {S,t,w};
             end
