@@ -426,8 +426,12 @@ classdef dbt
                 invtaper = 1;
             end
             
+            if nsh > 0
                 %%% Retain the leading edge if there is an offset
-               F0 = squeeze(F(1:nsh,1,:)).*repmat(invtaper',1,ncol); 
+               F0 = permute(F(1:nsh,1,:),[1 3 2]).*repmat(invtaper',1,ncol); 
+            else
+                F0=zeros(0,ncol);
+            end
             
             F(1:nsh,:,:)=[];
             Ffull = zeros(me.fullN,ncol);
