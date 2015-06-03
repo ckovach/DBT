@@ -243,7 +243,7 @@ classdef dbt
            %%% circular shift.
            rsmat = noffset + repmat((0:nwin-1)*(winN),round(winN*(1+me.shoulder)),1) + repmat((1:round(winN*(1+me.shoulder)))',1,nwin);% -nsh;
            rsmat = mod(rsmat-1,newn)+1;
-
+           dcindx = find(rsmat==1);
 
              tp = me.taper.make((0:1:nsh-1)/nsh); 
             invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
@@ -282,7 +282,8 @@ classdef dbt
 
                 %%% Corrections for DC and Nyquist to preserve power
                 %%% after zeroing negative frequencies
-                Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
+%                 Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
+                Frs(dcindx + (k-1)*numel(rsmat))=Frs(dcindx + (k-1)*numel(rsmat))/sqrt(2); 
 
            end
 
