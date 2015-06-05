@@ -233,8 +233,11 @@ classdef dbt
            nsh = min(ceil(me.shoulder*newbw./fs*newn),winN);
            me.shoulder = nsh*fs./newn./newbw;
            
-           noffset = round(me.offset*newT -nsh );
-           me.offset = noffset*fs/newn + newbw*me.shoulder;
+%            noffset = round(me.offset*newT -nsh );
+%            me.offset = noffset*fs/newn + newbw*me.shoulder;
+           noffset = round((me.offset - newbw*(1+me.shoulder)/2)*newT );
+           me.offset = noffset*fs/newn + newbw*(1+me.shoulder)/2;
+    
            me.bands(:,1) = (me.offset-newbw*(1+me.shoulder)/2:newbw:me.lowpass-newbw*(1-me.shoulder)/2);%-newfs/newn;
            me.bands(:,2) = me.bands(:,1)+newbw*(1+me.shoulder);%+newfs/newn;
            nwin =size(me.bands,1);
@@ -370,8 +373,9 @@ classdef dbt
             if nargin < 4 || isempty(return_padded)
                return_padded = false; 
             end
-            n = me.fullN;
-            noffset = round((me.offset-me.bandwidth*me.shoulder)./me.fullFS*n);
+            
+%             noffset = round((me.offset-me.bandwidth*me.shoulder)./me.fullFS*n);
+             noffset = round((me.offset - me.bandwidth*(1+me.shoulder)/2)*me.fullN/me.fullFS );
             ncol = size(me.blrep,3);
            if me.remodphase  
                %%% If phase remodulation was applied we need to reverse it.
