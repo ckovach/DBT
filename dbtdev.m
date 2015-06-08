@@ -99,7 +99,7 @@ classdef dbtdev
     	 fftpad = 0; % Upsample each band by padding its fft by this proportion of the unpadded length.
         upsampleFx = 0; %Amount by which to oversample the frequency dimension.
         userdata=[];
-        centerDC = false; % If true, bands are demodulated to [-bandwidth bandwidth], otherwise to [0 bandwidth] with zero padding to 2*bandwidth.
+        centerDC = true; % If true, bands are demodulated to [-bandwidth bandwidth], otherwise to [0 bandwidth] with zero padding to 2*bandwidth.
                           % If true, the pass band is centered at 0, so
                           % that the signal contains negative
                           % frequencies, which halves the number of
@@ -107,9 +107,8 @@ classdef dbtdev
                           
          bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
-        remodphase = true; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary to get a
-                            % correct average when averaging the spectrum
-                            % over time.
+        remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
+                            % correct average when averaging the raw spectrum over time.
           padding = 'time'; % Options are 'time' or 'none'; 'frequency' is obsolete.
     end    
     
@@ -257,20 +256,29 @@ classdef dbtdev
            me.shoulder = nsh*fs./newn./newbw;
          
            %%% Adjust for upsampling
-           stepsize = newbw/(me.upsampleFx +1);
-           nstepsize = round(stepsize*newT);
+           % This will add extra bands at negative frequencies so that the
+           % number of bands is an integer multiple of the frequency upsampling
+           % ratio. This is a bookkeeping measure to ensure that all frequencies
+           % within the desired range are oversampled to the same degree.
+           %
+           %
            upratio = me.upsampleFx+1;
-           me.offset = me.offset - floor(nsh./(nstepsize+1))*stepsize; % Include any bands that overlap with lower edge so that the lowest band oversampled to the same degree as other bands
-            foffset = me.offset-newbw*(1+me.shoulder)/2;
+           stepsize = newbw/upratio;
+           nstepsize = round(stepsize*newT);
+%            me.offset = me.offset - floor(nsh./(nstepsize+1))*stepsize; % Include any bands that overlap with lower edge so that the lowest band oversampled to the same degree as other bands
+%         foffset = me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize;
+           % This adjusts the high-pass offset so it is an integer multiple of
+           % frequency sampling
+           foffset = floor((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
            noffset = round(foffset*newT );
-           me.offset = noffset*fs/newn + newbw*(1+me.shoulder)/2;
-        
-%            me.lowpass = me.lowpass + floor(nsh./(nstepsize+1))*stepsize;% same for highest band
-           me.lowpass =  foffset + ceil((me.lowpass -foffset)/(stepsize*upratio))*stepsize*upratio;% same for highest band
+           foffset=noffset/newT;
+           me.offset = foffset + newbw*(1+me.shoulder)/2;
+           
+           lowp =  foffset + ceil((me.lowpass -foffset + upratio*stepsize )/(stepsize*upratio))*upratio*stepsize ;% same for highest band
            
            
           
-           me.bands(:,1) = (foffset:stepsize:me.lowpass-stepsize);%-newfs/newn;
+           me.bands(:,1) = (foffset:stepsize:lowp - stepsize);%-newfs/newn;
            me.bands(:,2) = me.bands(:,1)+newbw*(1+me.shoulder);%+newfs/newn;
            nwin =size(me.bands,1);
 
@@ -281,7 +289,7 @@ classdef dbtdev
                    repmat((1:round(winN*(1+me.shoulder)))',1,nwin);% -nsh;
                          
            rsmat = mod(rsmat-1,newn)+1;
-           dcindx = find(rsmat==1);
+           %dcindx = find(rsmat==1);
 
              tp = me.taper.make((0:1:nsh-1)/nsh); 
             invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
@@ -321,7 +329,7 @@ classdef dbtdev
                 %%% Corrections for DC and Nyquist to preserve power
                 %%% after zeroing negative frequencies
 %                 Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
-                Frs(dcindx + (k-1)*numel(rsmat))=Frs(dcindx + (k-1)*numel(rsmat))/sqrt(2); 
+              %  Frs(dcindx + (k-1)*numel(rsmat))=Frs(dcindx + (k-1)*numel(rsmat))/sqrt(2); 
 
            end
 
@@ -346,8 +354,8 @@ classdef dbtdev
          
            me.time = (((1:size(me.blrep,1))-1)*newT./size(me.blrep,1))';
            w = mean(me.bands,2)';
-           me.blrep(:,w > me.lowpass + me.shoulder*bw,:) = [];
-           w(w > me.lowpass + me.shoulder*bw) = [];
+            me.blrep(:,w > lowp + me.shoulder*bw,:) = 0;
+%             w(w > me.lowpass + me.shoulder*bw) = [];
            me.frequency = w;
 
            if me.remodphase  
@@ -484,13 +492,13 @@ classdef dbtdev
                 case {'frequency','fft'}
                     warning('Frequency padding is an obsolete option.')
             end
-            T = me.fullN./me.fullFS;
+            T = me.fullN./me.fullFS; %Signal duration after padding
             for k = 1:ncol
                 
                for upsi = 1:upratio
                     f = F(:,:,k,upsi);
-%                Q(1 + mod(noffset + nstepsize*(upsi) + (1:numel(f))-1,me.fullN),upsi)=f(:);
-                     nofs = round(me.bands(upsi + upratio,1)*T);
+%                Q( 1 + mod(nofs + (1:numel(f))-1,me.fullN),upsi)=f(:);
+                     nofs = round((me.bands(upsi,1) + me.bandwidth*me.shoulder)*T);
                      %%% Reconstruct signal, averaging over the oversampled
                      %%% bands.
                      Ffull( 1 + mod(nofs + (1:numel(f))-1,me.fullN),k) =...
@@ -500,7 +508,7 @@ classdef dbtdev
                if ~mod(me.fullN,2)
                   Ffull(ceil(me.fullN/2+1),k) = Ffull(ceil(me.fullN/2+1),k)/2;
                end
-               Ffull(1,k) = real(Ffull(1,k))/sqrt(2);
+               Ffull(1,k) = real(Ffull(1,k))/2;
             end
             Ffull(ceil((me.fullN+1)/2)+1:end,:,:) = 0;
             
