@@ -165,7 +165,7 @@ if spike.remove_spikes
 end
 
 if ~use_stft
-    blsig = dbt(x,fs,bandwidth,'padding','time','shoulder',shoulder,varargin{:}); % Band limited representation of the signal (see dbt)
+    blsig = dbt(x,fs,bandwidth,'padding','time','shoulder',shoulder,'upsample',1,varargin{:}); % Band limited representation of the signal (see dbt)
     nsmbw = ceil(smbw./blsig.bandwidth);
 else
     blsig = stft(x,fs,bandwidth,'shoulder',shoulder,varargin{:}); % Band limited representation of the signal (see dbt)    
