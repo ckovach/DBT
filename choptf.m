@@ -34,7 +34,14 @@ if ~isempty(trref)
     Tref= chopper(trref,times,db.sampling_rate);
     Tref(Tref<1|Tref>length(db.time)) = length(db.time)+1;
 
+else
+    Tref = [];
 end
+
+if any(T(:)<1|T(:)>length(db.time)) || any(Tref(:)<1|Tref(:)>length(db.time))
+    warning('%i time points are out of range of the input vector.\nCorresponding samples will be replaced with ones.',sum(T(:)<1|T(:)>length(db.time))+sum(Tref(:)<1|Tref(:)>length(db.time)))
+end
+
 x = ones(length(db.time)+1,1);
 nch = size(db.blrep,3);
 CH = zeros([length(tt),length(db.frequency),size(T,2), nch]);
