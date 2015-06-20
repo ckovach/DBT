@@ -37,7 +37,7 @@ subtract_mean = true; % Subtract the average as with an ordinary correlation.
                        % simple coherence analyses but may be important for
                        % event-related PAC.
 permtest = nargout>6; % Run a permutation test if true
-nperm = 1000; % number of permutations
+nperm = 200; % number of permutations
 
 dbtargs = {'remodphase',subtract_mean};
 
@@ -178,11 +178,11 @@ for i = 1:length(dbx.frequency)
            coh(:,:,i,t) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
         end
 
-        if nargout > 4
+        if nargout > 5
 %             cblx = blx-repmat(mean(blx),size(blx,1),1);
 %             cbly = bly-repmat(mean(bly),size(bly,1),1);
 %            trf(:,:,i,t) = diag(sum(abs(blx).^2))\(blx'*bly);
-           trf(:,:,i,t) = diag(sum(abs(bly).^2))\(blx'*bly);
+           trf(:,:,i,t) = (blx'*bly)/diag(sum(abs(bly).^2));
         end
 
     end
