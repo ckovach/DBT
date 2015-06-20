@@ -27,7 +27,7 @@ function [xypac,dbamp,dbph] = dbtpac(X,Y,fs,varargin)
 
 phasebw = [];
 ampbw =40; 
-phaserange = [0 24];
+phaserange = [];
 amprange = [0 300];
 
 % coherence = false; % compute coherence instead of PAC if true
@@ -44,6 +44,8 @@ get_csd = false;
 trf = [];
 csd =[];
 cohargs = {};
+dbtargs = {};
+do_permtest = false;
 % if nargin <3 && isa(X,'dbt')
 %     fs = X.fullFS;
 % end
@@ -61,9 +63,9 @@ while i < length(varargin)
        case 'ampbw'
            ampbw = varargin{i+1};
            i = i+1;
-       case 'coherence'
-           coherence = varargin{i+1};
-           i = i+1;
+%        case 'coherence'
+%            coherence = varargin{i+1};
+%            i = i+1;
        case 'phase range'
            phaserange = varargin{i+1};
            i = i+1;
@@ -73,12 +75,12 @@ while i < length(varargin)
 %        case 'phasefs'
 %            phasefs= varargin{i+1};
 %            i = i+1;
-       case 'smwin'
-           smwin= varargin{i+1};
-           i = i+1;
-         case 'partial'
-           partial= varargin{i+1};
-           i = i+1;
+%        case 'smwin'
+%            smwin= varargin{i+1};
+%            i = i+1;
+%          case 'partial'
+%            partial= varargin{i+1};
+%            i = i+1;
          case 'keep time'
            keep_time= varargin{i+1};
            i = i+1;
@@ -94,7 +96,12 @@ while i < length(varargin)
         case {'center','subtract mean'}
            cohargs = [cohargs,varargin(i:i+1)];
            i = i+1;
-    
+        case {'dbtargs'}
+           dbtargs = [dbtargs,varargin{i+1}]; %#ok<*AGROW>
+           i = i+1;
+       case 'do_permtest'
+           do_permtest = varargin{i+1};
+           i = i+1;
        otherwise
            error('Unrecognized keyword %s',varargin{i})
    end
@@ -103,9 +110,13 @@ end
 
 
     
-ampargs = {fs,ampbw,'padding','time','lowpass',min(amprange(2),fs/2),'offset',amprange(1)};
+ampargs = {fs,ampbw,'padding','time','lowpass',min(amprange(2),fs/2),'offset',amprange(1),dbtargs{:}};
 dbamp = dbt(Y,ampargs{:}); %%% DBT from which band-limited amplitude will be obtained. 
 ampfs = dbamp.sampling_rate;
+
+if isempty(phaserange)
+   phaserange = [0 dbamp.sampling_rate/2]; 
+end
 
 if isempty(phasebw)
     %%% If no other bandwidth is specified default to a reasonable value
@@ -114,19 +125,22 @@ if isempty(phasebw)
 end
 
 if isempty(keep_time)
-    keepT = true(size(dbamp.time));
+    keepT = dbamp.time<=dbamp.Norig./dbamp.fullFS;
 else
     keepT = resampi(keep_time,fs,ampfs,'linear')>.5;
 end
 % Downsample data to match the DBT sampling rate for amplitude. 
 Xrs = resampi(X,fs,ampfs,'fft');
-
-phargs = {phasebw,'padding','time','lowpass',min(phaserange(2),fs/2),'offset',phaserange(1),'keep time',keepT,phargs{:}};
+Xrs(end+1:length(dbamp.time),:,:) =0;
+Pperm =[];
+phargs = {phasebw,'padding','time','lowpass',min(phaserange(2),fs/2),'offset',phaserange(1),'keep time',keepT,phargs{:},dbtargs{:}}; %#ok<*CCAT>
 fprintf('\nBand: %4i',0)
 for k = 1:length(dbamp.frequency)   
     fprintf('\b\b\b\b%4i',k)
     if get_trf
         [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});
+    elseif do_permtest
+         [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
     else
         [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
     end
@@ -151,3 +165,4 @@ xypac.args.dbphase = phargs;
 xypac.tt = tt;
 xypac.trf = trf;
 xypac.csd = csd;
+xypac.Pperm= Pperm;
