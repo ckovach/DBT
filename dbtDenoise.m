@@ -96,7 +96,7 @@ while i <= length(varargin)
                   filter_above = varargin{i+1};
                   varargin(i:i+1) = [];
                   i = i-1;
-               case {'remove spikes'}  % use stft instead of dbt
+               case {'remove spikes'}  
                   
                   spike.remove_spikes = varargin{i+1};
                   if ~islogical(spike.remove_spikes) && spike.remove_spikes~=1 && spike.remove_spikes~=0
@@ -104,6 +104,10 @@ while i <= length(varargin)
                   end
                   varargin(i:i+1) = [];
                   i = i-1;
+                 case {'spike window'}  % spike window widht 
+                    spike.smoothwindow = varargin{i+1};
+                    varargin(i:i+1) = [];
+                     i = i-1;
                 case {'zhithresh','high threshold'}  % coefficient threshold
                   zhithresh = varargin{i+1};
                   varargin(i:i+1) = [];
