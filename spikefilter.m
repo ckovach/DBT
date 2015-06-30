@@ -34,7 +34,16 @@ if nargin < 3
                           % distortion of kurtosis used in the
                           % kurtosis-threshold.
     spike.smoothwindow = .2;% Apply hanning window of given duration to smooth the spike filter.
-
+    
+    spike.interpolate = false; % If true, interpolates values through a weighted average, 
+                               % with a Hann interpolation window twice
+                               % the size of the smoothing window.
+                               % If false, then data are subjected to
+                               % simple windowing, with excluded points
+                               % scaled towards zero.
+                               % If a scalar value is given, then uses a
+                               % Hann window of the given duration. 
+                               % A vector is taken directly as the interpolation window.
 end
 
 spks = false(size(x));
@@ -49,6 +58,36 @@ if isscalar(spike.smoothwindow)
 else
     win = spike.smoothwindow; 
 end
+
+if isscalar(spike.interpolate) && spike.interpolate
+    if islogical(spike.interpolate)
+          %%% Use a default interpolation window with twice the support of the smoothing
+          %%% window.
+        interpwin = hanning(round(length(win)*2));
+    else
+        %%% Scalar values are treated as the interpolation window duration
+        interpwin = hanning(ceil(spike.interpolate.*fs));
+    end
+elseif ~isscalar(spike.interpolate)
+    %%% For a non-scalar value, the input is the window. 
+    interpwin = spike.interpolate;
+else
+    interpwin = 0;
+end
+   
+        
+    
 spike.filter = exp(convn(log(1-spks+eps),win,'same'));
 spike.filter(spike.filter<0)=0;
-xfilt = x.*spike.filter;
+
+%interpwin = win;
+if ~isequal(interpwin,0)
+    %%% Smooth x through weighted averaging. 
+    xconv = convn(x.*spike.filter,interpwin,'same')./convn(spike.filter,interpwin,'same');
+    xinterp = + (1-spike.filter).*xconv;
+else
+    xinterp = 0;
+end
+
+xfilt = x.*spike.filter + xinterp;
+
