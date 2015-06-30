@@ -65,6 +65,7 @@ spike.threshold = 10; % This is the threshold used in detecting spikes.
                       % distortion of kurtosis used in the
                       % kurtosis-threshold.
 spike.smoothwindow = .2;% Apply hanning window of given duration to smooth the spike filter.
+spike.interpolate = false;% 
 filter_above = 40; 
 use_stft = false;
 zhithresh = 6;
