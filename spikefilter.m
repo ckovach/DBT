@@ -44,6 +44,9 @@ if nargin < 3
                                % If a scalar value is given, then uses a
                                % Hann window of the given duration. 
                                % A vector is taken directly as the interpolation window.
+                               % If a string, then it uses the matlab
+                               % interp1 function with the specified method
+                               % (eg. 'spline').
 end
 
 spks = false(size(x));
@@ -80,14 +83,20 @@ end
 spike.filter = exp(convn(log(1-spks+eps),win,'same'));
 spike.filter(spike.filter<0)=0;
 
-%interpwin = win;
-if ~isequal(interpwin,0)
-    %%% Smooth x through weighted averaging. 
-    xconv = convn(x.*spike.filter,interpwin,'same')./convn(spike.filter,interpwin,'same');
-    xinterp = + (1-spike.filter).*xconv;
+if ~ischar(spike.interpolate)
+    %interpwin = win;
+    if ~isequal(interpwin,0)
+        %%% Smooth x through weighted averaging. 
+        xconv = convn(x.*spike.filter,interpwin,'same')./convn(spike.filter,interpwin,'same');
+        xinterp = + (1-spike.filter).*xconv;
+    else
+        xinterp = 0;
+    end
+
+    xfilt = x.*spike.filter + xinterp;
 else
-    xinterp = 0;
+    t = (1:size(x,1))';
+    xfilt = interp1(t(spike.filter>.5),x(spike.filter>.5),t,spike.interpolate);
 end
 
-xfilt = x.*spike.filter + xinterp;
 

@@ -42,7 +42,7 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %      'zlothresh'     : Threshold for coefficient removal in frequency
 %                        banbds that fall above 'kthresh'. (default = 3).
 %       
-% See also DBT
+% See also DBT, SPIKEFILTER
 
 % C Kovach 2013
 % ----------- SVN REVISION INFO ------------------
@@ -108,6 +108,11 @@ while i <= length(varargin)
                  case {'spike window'}  % spike window widht 
                     spike.smoothwindow = varargin{i+1};
                     varargin(i:i+1) = [];
+                     i = i-1;
+                 case {'spike opts'}  % option structure for spike exclusion (see SPIKEFILTER)
+                    spike = varargin{i+1};
+                    varargin(i:i+1) = [];
+                    spike.remove_spikes = true;
                      i = i-1;
                 case {'zhithresh','high threshold'}  % coefficient threshold
                   zhithresh = varargin{i+1};
