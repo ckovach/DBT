@@ -87,7 +87,7 @@ if ~ischar(spike.interpolate)
     %interpwin = win;
     if ~isequal(interpwin,0)
         %%% Smooth x through weighted averaging. 
-        xconv = convn(x.*spike.filter,interpwin,'same')./convn(spike.filter,interpwin,'same');
+        xconv = convn(x.*spike.filter,interpwin,'same')./(convn(spike.filter,interpwin,'same')+eps);
         xinterp = + (1-spike.filter).*xconv;
     else
         xinterp = 0;
