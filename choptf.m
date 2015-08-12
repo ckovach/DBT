@@ -61,7 +61,7 @@ for i = 1:nch
             switch normalization
                 case 'geometric mean'
                     tol = 1e-9;
-                    x = x + 0./(abs(x)<tol); %Make values below tolerance nan
+                    x = x + 0./(abs(x)>tol); %Make values below tolerance nan
                     nrm = repmat(exp(nanmean(log(abs(x(Tref))))),length(tt),1);
                 case 'mean envelope'
                     %%% Trial by trial normalization is biased
