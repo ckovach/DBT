@@ -1,4 +1,4 @@
-function [CH,tt,T] = choptf(trg,times,db,trref)
+function [CH,tt,T] = choptf(trg,times,db,trref,normalization)
 
 % [CH,tt] = choptf(trange,evnt_times,db,trref)
 % Chop dbt data into epochs and normalize 
@@ -14,7 +14,13 @@ function [CH,tt,T] = choptf(trg,times,db,trref)
 
 %C. Kovach 2014
 
-if nargin < 4
+if nargin < 5 || isempty(normalization)
+    normalization= 'geometric mean';
+    %normalization= 'root mean power';
+    %normalization= 'mean envelope';
+end
+
+if nargin < 4 || isempty(trref)
     trref = [];
     nrm = 1;
 end
@@ -49,11 +55,25 @@ for i = 1:nch
     for k = 1:length(db.frequency)
 
         x(1:length(db.time)) = db.blrep(:,k,i);
-
         if ~isempty(trref)
             %%% normalizing by mean envelope
-%            nrm = repmat(mean(abs(x(Tref))),length(tt),1);
-            nrm = repmat(exp(mean(log(abs(x(Tref))))),length(tt),1);
+            nrm = repmat(mean(abs(x(Tref))),length(tt),1); 
+            switch normalization
+                case 'geometric mean'
+                    tol = 1e-9;
+                    x = x + 0./(abs(x)<tol); %Make values below tolerance nan
+                    nrm = repmat(exp(nanmean(log(abs(x(Tref))))),length(tt),1);
+                case 'mean envelope'
+                    %%% Trial by trial normalization is biased
+%                   nrm = repmat(mean(abs(x(Tref))),length(tt),1); 
+                   nrm = mean(abs(x(Tref(:)))); 
+                case 'root mean power'
+                    %%% Trial by trial normalization is biased
+%                   nrm = repmat(sqrt(nanmean(abs(x(Tref)).^2)),length(tt),1); 
+                   nrm = sqrt(nanmean(abs(x(Tref(:))).^2)); 
+                otherwise
+                    error('Unrecognized normalization "%s"',normalization)
+            end
         end
         
         CH(:,k,:,i) = x(T)./nrm;
