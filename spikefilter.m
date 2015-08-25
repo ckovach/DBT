@@ -1,4 +1,4 @@
-function [xfilt,spike] = spikefilter(x,fs,spike)
+function [xout,spike] = spikefilter(xin,fs,spike)
 
 
 % Simple script to remove outliers through iterative thresholding. Outliers
@@ -49,54 +49,61 @@ if nargin < 3
                                % (eg. 'spline').
 end
 
-spks = false(size(x));
-newspks = true;
-while any(newspks)
-       z = (x-mean(x(~spks)))/std(x(~spks));
-       newspks = abs(z)>spike.threshold &~spks; 
-       spks = newspks | spks;
-end
-if isscalar(spike.smoothwindow)
-    win = hanning(ceil(spike.smoothwindow.*fs));
-else
-    win = spike.smoothwindow; 
-end
+DB_attenuation = 50; %Peak attenuation for an isolated impulse
 
-if isscalar(spike.interpolate) && spike.interpolate
-    if islogical(spike.interpolate)
-          %%% Use a default interpolation window with twice the support of the smoothing
-          %%% window.
-        interpwin = hanning(round(length(win)*2));
-    else
-        %%% Scalar values are treated as the interpolation window duration
-        interpwin = hanning(ceil(spike.interpolate.*fs));
+xout = zeros(size(xin));
+for k = 1:size(xin,2)
+    x = xin(:,k);
+    spks = false(size(x));
+    newspks = true;
+    while any(newspks)
+        z = (x-mean(x(~spks)))/std(x(~spks));
+        newspks = abs(z)>spike.threshold &~spks;
+        spks = newspks | spks;
     end
-elseif ~isscalar(spike.interpolate)
-    %%% For a non-scalar value, the input is the window. 
-    interpwin = spike.interpolate;
-else
-    interpwin = 0;
-end
-   
-        
+    if isscalar(spike.smoothwindow)
+        win = hanning(ceil(spike.smoothwindow.*fs));
+    else
+        win = spike.smoothwindow;
+    end
     
-spike.filter = exp(convn(log(1-spks+eps),win,'same'));
-spike.filter(spike.filter<0)=0;
-
-if ~ischar(spike.interpolate)
-    %interpwin = win;
-    if ~isequal(interpwin,0)
-        %%% Smooth x through weighted averaging. 
-        xconv = convn(x.*spike.filter,interpwin,'same')./(convn(spike.filter,interpwin,'same')+eps);
-        xinterp = + (1-spike.filter).*xconv;
+    if isscalar(spike.interpolate) && spike.interpolate
+        if islogical(spike.interpolate)
+            %%% Use a default interpolation window with twice the support of the smoothing
+            %%% window.
+            interpwin = hanning(round(length(win)*2));
+        else
+            %%% Scalar values are treated as the interpolation window duration
+            interpwin = hanning(ceil(spike.interpolate.*fs));
+        end
+    elseif ~isscalar(spike.interpolate)
+        %%% For a non-scalar value, the input is the window.
+        interpwin = spike.interpolate;
     else
-        xinterp = 0;
+        interpwin = 0;
     end
-
-    xfilt = x.*spike.filter + xinterp;
-else
-    t = (1:size(x,1))';
-    xfilt = interp1(t(spike.filter>.5),x(spike.filter>.5),t,spike.interpolate);
+    
+    
+    
+%     spike.filter(:,k) = exp(convn(log(1-spks+eps),win,'same'));
+    spike.filter(:,k) = 10.^(-DB_attenuation/20*convn(spks,win,'same'));
+    spike.filter(spike.filter<0,k)=0;
+    
+    if ~ischar(spike.interpolate)
+        %interpwin = win;
+        if ~isequal(interpwin,0)
+            %%% Smooth x through weighted averaging.
+            xconv = convn(x.*spike.filter(:,k),interpwin,'same')./(convn(spike.filter(:,k),interpwin,'same')+eps);
+            xinterp = + (1-spike.filter(:,k)).*xconv;
+        else
+            xinterp = 0;
+        end
+        
+        xfilt = x.*spike.filter(:,k) + xinterp;
+    else
+        t = (1:size(x,1))';
+        xfilt = interp1(t(spike.filter(:,k)>.5),x(spike.filter(:,k)>.5),t,spike.interpolate);
+    end
+    xout(:,k)=xfilt;
 end
-
-
+    
