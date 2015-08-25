@@ -47,11 +47,16 @@ if nargin < 3
                                % If a string, then it uses the matlab
                                % interp1 function with the specified method
                                % (eg. 'spline').
+                               
+   spike.combine_channels =false; % If true, combine the filter across channels and apply the same filter to all channels.                              
 end
 
 DB_attenuation = 50; %Peak attenuation for an isolated impulse
 
 xout = zeros(size(xin));
+if size(xin,2)<2
+   spike.combine_channels = false; 
+end
 for k = 1:size(xin,2)
     x = xin(:,k);
     spks = false(size(x));
@@ -88,22 +93,25 @@ for k = 1:size(xin,2)
 %     spike.filter(:,k) = exp(convn(log(1-spks+eps),win,'same'));
     spike.filter(:,k) = 10.^(-DB_attenuation/20*convn(spks,win,'same'));
     spike.filter(spike.filter<0,k)=0;
-    
-    if ~ischar(spike.interpolate)
-        %interpwin = win;
-        if ~isequal(interpwin,0)
-            %%% Smooth x through weighted averaging.
-            xconv = convn(x.*spike.filter(:,k),interpwin,'same')./(convn(spike.filter(:,k),interpwin,'same')+eps);
-            xinterp = + (1-spike.filter(:,k)).*xconv;
-        else
-            xinterp = 0;
-        end
-        
-        xfilt = x.*spike.filter(:,k) + xinterp;
+end
+
+if spike.combine_channels
+   spike.filter = repmat(prod(spike.filter,2),1,size(xin,2)); 
+end
+
+if ~ischar(spike.interpolate)
+    %interpwin = win;
+    if ~isequal(interpwin,0)
+        %%% Smooth x through weighted averaging.
+        xconv = convn(xin.*spike.filter,interpwin,'same')./(convn(spike.filter,interpwin,'same')+eps);
+        xinterp = + (1-spike.filter).*xconv;
     else
-        t = (1:size(x,1))';
-        xfilt = interp1(t(spike.filter(:,k)>.5),x(spike.filter(:,k)>.5),t,spike.interpolate);
+        xinterp = 0;
     end
-    xout(:,k)=xfilt;
+
+    xout = xin.*spike.filter + xinterp;
+else
+    t = (1:size(x,1))';
+    xout = interp1(t(spike.filter>.5),xin(spike.filter>.5,:),t,spike.interpolate);
 end
     
