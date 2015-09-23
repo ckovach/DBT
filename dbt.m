@@ -22,8 +22,10 @@ classdef dbt
 %   .bandwidth:  bandwidth of the DBT.
 %   .sampling_rate: sampling rate after the transform.
 %   .time:  sampled time points.
-%   .frequency: sampled center frequencies/
-%   .bands: band limits for each frequency band/
+%   .frequency: sampled center frequencies. Note that with upsampling, in order 
+%      		to simplify bookkeeping, the DBT matrix may include bands whose 
+%               center frequency is negative or greater than nyquist.
+%   .bands: band limits for each frequency band.
 %   .taper: taper used to window frequency bands.
 %   .padding: whether signal duration is adjusted through time padding
 %             ('time') or fequency padding ('frequency').
@@ -74,6 +76,7 @@ classdef dbt
 %     C Kovach 2013 - 2015
 % 
 
+% Please cite: Kovach, Christopher and Phillip Gander. (submitted) The demodulated band transform.
 
     properties 
         
@@ -213,8 +216,8 @@ classdef dbt
                    me.bwtol = Inf;
            end
                    
-            %%% Pad signal in time so that bandwidth is approximately
-            %%% divides padded duration duration
+            %%% Pad signal in time so that bandwidth approximately
+            %%% divides padded duration 
             
 %             [~,den] = rat(bw/fs/2,me.bwtol);
             stepsize = bw/(me.upsampleFx +1);           
