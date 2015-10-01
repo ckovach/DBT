@@ -1,8 +1,7 @@
 function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 
 % Denoise using the demodulated band representation of a signal (see
-% DBT). A threshold is computed on the coefficients using a threshold on
-% kurtosis.
+% DBT). 
 %
 % Usage:
 %
