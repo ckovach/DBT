@@ -154,17 +154,6 @@ shoulder  = 1; %This is overridden if passed as an argument in varargin
 
 if spike.remove_spikes    
     [x,spike] = spikefilter(x,fs,spike);
-%     spks = false(size(x));
-%     newspks = true;
-%     while any(newspks)
-%        z = (x-mean(x(~spks)))/std(x(~spks));
-%        newspks = abs(z)>spike.threshold &~spks; 
-%        spks = newspks | spks;
-%     end
-%     win = hanning(ceil(spike.smoothwindow.*fs));
-%     spike.filter = exp(convn(log(1-spks+eps),win,'same'));
-%     spike.filter(spike.filter<0)=0;
-%     x = x.*spike.filter;
 end
 
 if ~use_stft
@@ -229,18 +218,11 @@ Z(:,w<filter_above) = 0;
 %Set threshold 
 LN = isnan(P) & Z > zlothresh | Z >zhithresh ;
 
-% % Smooth edges a little to reduce time-domain artifacts 
-% g = gausswin(ceil(.5./blsig.sampling_rate));
-% g = g./max(g);
-% LN = convn(LN,g./sum(g),'same');
 
 F = (1-LN).*F0;
 
-% if makeplots
-%    [orig,bl] = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold); %takes out the baseline by fitting a polynomial
-%    orig = 10*log10(abs(nanmean(abs(orig).^2)))';
-% end
 
+%%% Apply the filter
 blsig.blrep = blsig.blrep.*F;
 
 xdn = blsig.signal;
@@ -249,8 +231,6 @@ xdn = xdn(1:length(x));
 
 
 if makeplots
-%    dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
-%    pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
    dnnsig = blsig.blrep; 
    pl = plot(blsig.frequency,100*(1-mean(F))');
    if ~isequal(F0,1)
