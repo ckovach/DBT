@@ -32,13 +32,18 @@ elseif nargin > 2
                 smoothbw = varargin{2};
             end
         case 'polynomial'
-            if nargin >= 4,            
+            if nargin >= 4 && ~isempty( varargin{2})            
                 polyord = varargin{2};
             end
     end
 end
+if nargin > 5
+      use_time = varargin{3}; 
+else
+    use_time = true(size(bx.time));
+end
 
-mn = mean(abs(bx.blrep),1);
+mn = mean(abs(bx.blrep(use_time,:,:)),1);
 kp = mn~=0 & usepts;
 switch smoothing_method
     case 'polynomial'
