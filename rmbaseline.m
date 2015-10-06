@@ -37,7 +37,7 @@ elseif nargin > 2
             end
     end
 end
-if nargin > 5
+if nargin > 4
       use_time = varargin{3}; 
 else
     use_time = true(size(bx.time));
