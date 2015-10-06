@@ -210,7 +210,7 @@ switch smoothing_method
         nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw,include_times); %takes out the baseline by fitting a polynomial
         
 end
-mn = mean(abs(nsig));
+mn = mean(abs(nsig(include_times,:,:)));
 
 
 %%% Compute z-score for mean power
@@ -235,7 +235,7 @@ ln = z>zlothresh;  %%% Threshold the adjusted z
 P = abs(nsig);
 P(:,w<filter_above) = nan;
 P(:,ln) = nan;
-
+P(~include_times,:) = nan;
 %Compute zscore over all time-frequency points without including the potentially contaminated frequencies in the variance estimate
 Z = (abs(nsig)-mean(abs(nsig(~isnan(P)))))./std(abs(nsig(~isnan(P))));
 
