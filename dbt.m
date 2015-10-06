@@ -6,8 +6,7 @@ classdef dbt
 %
 %  B = dbt(X,Fs,BW)
 %
-%  X  - Signal as a column vector. If X is a matrix, each column is a separate
-%        signal.
+%  X  - Signal matrix with channels in columns. 
 %  Fs - Sampling frequency
 %  BW - Bandwidth of decomposition
 % 
@@ -22,8 +21,8 @@ classdef dbt
 %   .bandwidth:  bandwidth of the DBT.
 %   .sampling_rate: sampling rate after the transform.
 %   .time:  sampled time points.
-%   .frequency: sampled center frequencies/
-%   .bands: band limits for each frequency band/
+%   .frequency: sampled center frequencies.
+%   .bands: band limits for each frequency band.
 %   .taper: taper used to window frequency bands.
 %   .padding: whether signal duration is adjusted through time padding
 %             ('time') or fequency padding ('frequency').
