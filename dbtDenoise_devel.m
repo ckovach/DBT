@@ -68,12 +68,12 @@ spike.smoothwindow = .2;% Apply hanning window of given duration to smooth the s
 spike.interpolate = false;% 
 filter_above = 40; 
 use_stft = false;
-zhithresh = 6;
-zlothresh = 3;
+zhithresh = 8;
+zlothresh = 4;
 makeplots = false;
 smoothing_method = 'polynomial';
 adjust_threshold = true; % If true this performs an initial denoising run at a higher threshold if an excessive number of frequency bands are rejected (>15 %)
-prefilter_threshold = 10; % Percent rejected bands needed to trigger prefiltering at a higher threshold
+prefilter_threshold = 15; % Percent rejected bands needed to trigger prefiltering at a higher threshold
 baseline_polyord = 10;
 smbw = 10;
 rm_edge_samples = 2; %Remove this many edge samples 
@@ -210,7 +210,7 @@ switch smoothing_method
         nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw,include_times); %takes out the baseline by fitting a polynomial
         
 end
-mn = mean(abs(nsig));
+mn = mean(abs(nsig(include_times,:,:)));
 
 
 %%% Compute z-score for mean power
@@ -235,10 +235,13 @@ ln = z>zlothresh;  %%% Threshold the adjusted z
 P = abs(nsig);
 P(:,w<filter_above) = nan;
 P(:,ln) = nan;
-
+P(~include_times,:) = nan;
 %Compute zscore over all time-frequency points without including the potentially contaminated frequencies in the variance estimate
-Z = (abs(nsig)-mean(abs(nsig(~isnan(P)))))./std(abs(nsig(~isnan(P))));
-
+  Z = (abs(nsig)-mean(abs(nsig(~isnan(P)))))./std(abs(nsig(~isnan(P))));
+while any(Z(~isnan(P))>zhithresh)
+    P = P + 0./(Z<=zhithresh);
+    Z = (abs(nsig)-mean(abs(nsig(~isnan(P)))))./std(abs(nsig(~isnan(P))));
+end
 % Exclude frequencies below 40
 Z(:,w<filter_above) = 0;
 %Set threshold 
