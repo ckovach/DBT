@@ -73,10 +73,10 @@ zlothresh = 3;
 makeplots = false;
 smoothing_method = 'polynomial';
 adjust_threshold = true; % If true this performs an initial denoising run at a higher threshold if an excessive number of frequency bands are rejected (>15 %)
-prefilter_threshold = 15; % Percent rejected bands needed to trigger prefiltering at a higher threshold
+prefilter_threshold = 10; % Percent rejected bands needed to trigger prefiltering at a higher threshold
 baseline_polyord = 10;
 smbw = 10;
-rm_edge_samples = 1; %Remove this many edge samples 
+rm_edge_samples = 2; %Remove this many edge samples 
 i = 1;
 while i <= length(varargin)
           switch lower(varargin{i})
@@ -198,7 +198,7 @@ F0=1;
 if adjust_threshold && pcntrej > prefilter_threshold/100;
     fprintf('\n%0.0f%% bands flagged. Prefiltering with higher rejection threshold.\n    ',pcntrej*100)
     [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,varargin{:},'low threshold',2*zlothresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold);
-    kt = kurtosis(abs(blsig.blrep));
+    kt = kurtosis(abs(blsig.blrep(include_times,:,:)));
 
 end
 
@@ -268,10 +268,10 @@ if makeplots
 %    dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
 %    pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
    dnnsig = blsig.blrep; 
-   pl = plot(blsig.frequency,100*(1-sum(F)./sum(include_times))');
+   pl = plot(blsig.frequency,100*(1-mean(F))');
    if ~isequal(F0,1)
         hold on
-        pl(2) = plot(blsig.frequency,100*(1-sum(F0)./sum(include_times))');
+        pl(2) = plot(blsig.frequency,100*(1-mean(F0))');
         set(pl(2),'color','b');
         hold off
         
