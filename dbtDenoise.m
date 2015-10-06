@@ -76,6 +76,7 @@ adjust_threshold = true; % If true this performs an initial denoising run at a h
 prefilter_threshold = 15; % Percent rejected bands needed to trigger prefiltering at a higher threshold
 baseline_polyord = 10;
 smbw = 10;
+rm_edge_samples = 1; %Remove this many edge samples 
 i = 1;
 while i <= length(varargin)
           switch lower(varargin{i})
@@ -149,7 +150,11 @@ while i <= length(varargin)
                   
                   varargin(i:i+1) = []; 
                   i = i-1; 
-                  
+             case {'remove edge','rm edge'} 
+                  %Number of edge samples to remove
+                  rm_edge_samples = double(varargin{i+1});
+                  varargin(i:i+1) = []; 
+                  i = i-1;  
               otherwise
 %                  error('Unrecognized keyword %s',varargin{i})
           end
@@ -183,7 +188,10 @@ else
 end
 w = blsig.frequency;
 
-kt = kurtosis(abs(blsig.blrep));
+include_times = blsig.time >= rm_edge_samples./blsig.sampling_rate  ...
+               & blsig.time <= blsig.Norig./blsig.fullFS - rm_edge_samples./blsig.sampling_rate;
+
+kt = kurtosis(abs(blsig.blrep(include_times,:,:)));
 
 pcntrej = mean(kt>kurtosis_threshold);
 F0=1;
@@ -197,9 +205,9 @@ end
 
 switch smoothing_method
     case 'polynomial'
-        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,baseline_polyord); %takes out the baseline by fitting a polynomial
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,baseline_polyord,include_times); %takes out the baseline by fitting a polynomial
     case 'moving_average'
-        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw); %takes out the baseline by fitting a polynomial
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw,include_times); %takes out the baseline by fitting a polynomial
         
 end
 mn = mean(abs(nsig));
@@ -236,6 +244,7 @@ Z(:,w<filter_above) = 0;
 %Set threshold 
 LN = isnan(P) & Z > zlothresh | Z >zhithresh ;
 
+
 % % Smooth edges a little to reduce time-domain artifacts 
 % g = gausswin(ceil(.5./blsig.sampling_rate));
 % g = g./max(g);
@@ -259,10 +268,10 @@ if makeplots
 %    dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
 %    pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
    dnnsig = blsig.blrep; 
-   pl = plot(blsig.frequency,100*(1-mean(F))');
+   pl = plot(blsig.frequency,100*(1-sum(F)./sum(include_times))');
    if ~isequal(F0,1)
         hold on
-        pl(2) = plot(blsig.frequency,100*(1-mean(F0))');
+        pl(2) = plot(blsig.frequency,100*(1-sum(F0)./sum(include_times))');
         set(pl(2),'color','b');
         hold off
         
