@@ -6,8 +6,7 @@ classdef dbt
 %
 %  B = dbt(X,Fs,BW)
 %
-%  X  - Signal as a column vector. If X is a matrix, each column is a separate
-%        signal.
+%  X  - Signal matrix with channels in columns. 
 %  Fs - Sampling frequency
 %  BW - Bandwidth of decomposition
 % 
