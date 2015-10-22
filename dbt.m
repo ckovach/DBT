@@ -218,7 +218,7 @@ classdef dbt
 %             [~,den] = rat(bw/fs/2,me.bwtol);
             stepsize = bw/(me.upsampleFx +1);   
             
-            %%% Signal padding will endure that the resulting bandwidth falls within some tolerance of the 
+            %%% Signal padding will ensure that the resulting bandwidth falls within some tolerance of the 
             %%% target velue. Tolerance is determined by the bwtol property.
             [~,den] = rat(stepsize/fs/2,me.bwtol);
            
