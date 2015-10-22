@@ -26,20 +26,16 @@ classdef dbt
 %               center frequency is negative or greater than nyquist.
 %   .bands: band limits for each frequency band.
 %   .taper: taper used to window frequency bands.
-%   .padding: whether signal duration is adjusted through time padding
-%             ('time') or fequency padding ('frequency').
 %   .fftpad: degree of oversampling achieved through fft padding. 1
 %            corresponds to 2x oversampling.
-%   .centerDC: If false (default), the fft of the DBT bands contains
+%   .centerDC: If false, the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
-%               otherwise each band is demodulated to be centered on DC.
+%               otherwise each band is demodulated to be centered on DC (default).
 %   
 %
 %  Options:
 %
 %  	offset   -  offset of the first band from 0hz (default = 0)
-%   padding  - 'time' (default) or 'none': pad signal in the time domain to
-%                adjust bandwidth.
 %   shoulder - (0 - 1) degree of overlap between neighboring bands (default = 1). 
 %                  Note that, at present, 1 is the maximum allowable value.
 %
@@ -51,7 +47,8 @@ classdef dbt
 %                  |-----------|           |-|
 %                   BW              shoulder
 %      
-%       By default,  the taper is defined so that squares sum to 1
+%       By default,  the taper is defined so that the square of overlapping
+%          regions sum to 1.
 %
 %  upsampleFx: upsample the frequency scale by a factor of (1+x) (default x
 %              = 0, no upsampling ).
