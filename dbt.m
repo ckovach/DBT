@@ -11,8 +11,6 @@ classdef dbt
 %  BW - Bandwidth of decomposition
 % 
 %
-%  B = dbt(X,Fs,Bw, ['option'], [value])
-%
 %  B is an object with the following properties:
 %
 %  B.blrep: time-frequency coefficients with rows corresponding to time
@@ -31,7 +29,9 @@ classdef dbt
 %   .centerDC: If false, the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
 %               otherwise each band is demodulated to be centered on DC (default).
+%
 %   
+%  B = dbt(X,Fs,Bw, ['option'], [value])
 %
 %  Options:
 %
