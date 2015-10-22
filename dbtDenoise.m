@@ -5,7 +5,7 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %
 % Usage:
 %
-%   [xdn,filt,dbt] = dbtDenoise(x,Fs,bandwidth,[keyword],[value])
+%   [xdn,filt,dbx] = dbtDenoise(x,Fs,bandwidth,[keyword],[value])
 %
 %    Inputs:
 % 
@@ -18,7 +18,7 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 % 
 %       xdn   - denoised signal
 %       filt  - filter used on DBT coefficients in denoising  
-%       blsig - DBT of xdn
+%       dbx - DBT of xdn
 %
 %    Keyword options:
 %       
@@ -73,11 +73,7 @@ i = 1;
 while i <= length(varargin)
           switch lower(varargin{i})
 
-              case {'stft'}  % use stft instead of bld
-                  use_stft = true; 
-                  varargin(i) = [];
-                  %i = i-1;
-              case {'dbt'}  % use stft instead of dbt
+           case {'dbt'}  % use stft instead of dbt
                   use_stft = false;                        
                   varargin(i) = [];
                   %i = i-1;
