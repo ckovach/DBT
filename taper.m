@@ -12,12 +12,12 @@ classdef taper
 %
 % summation_order:  Require that the taper, f(x), satisfy 
 %                   f(x)^p + f(1-x)^p = 1.  Default is p = 2. This creates
-%                   a function  g(x) = h(x) for x>=0 and g(x) = (1-h(1-abs(x))^p)^1/p for 
+%                   a function  g(x) = h(x) for x>=0 and g(x) = (1-h(1-abs(x))^p)^(1/p) for 
 %                   x < 0. For p = 0 g(x) = h(x).
 %
 % symmetric:   Require that the taper be symmetric if true. If true,
 %              then the taper function is
-%                   f(x) = (g(x)+g(-x))/2.
+%                   f(x) = ((g(x)^p+g(-x)^p)/2)^(1/p).
 %              Default is true.
 %Methods:
 %
