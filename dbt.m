@@ -72,7 +72,7 @@ classdef dbt
 %     C Kovach 2013 - 2015
 % 
 
-% Please cite: Kovach, Christopher and Phillip Gander. (submitted) The demodulated band transform.
+% Please cite: Kovach, Christopher and Phillip Gander. (submitted) The demodulated band transform. arXiv:1510.03113 [q-bio.QM]
 
     properties 
         
