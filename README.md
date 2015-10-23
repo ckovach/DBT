@@ -2,4 +2,4 @@
 
 This repository contains DBT spectral analysis scripts for matlab
 
-For informatin about the DBT please refer to Kovach & Gander (submitted). A preprint is available here: [arXiv:1510.03113](http://arxiv.org/abs/1510.03113)
+For more information please refer to Kovach & Gander (submitted). A preprint is available here: [arXiv:1510.03113](http://arxiv.org/abs/1510.03113)
