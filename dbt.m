@@ -42,7 +42,7 @@ classdef dbt
 %      The overlapping portions of the bands are windowed with a  taper:
 %              ____   __________   ________   _________
 %                  \ /	        \ /        \ /   
-%     .  .  .	  X              X          X           . . . 
+%    .  .  .	    X            X          X           . . . 
 %                  / \	        / \        / \
 %                  |-----------|           |-|
 %                   BW              shoulder
@@ -109,9 +109,10 @@ classdef dbt
     
         function me = dbt(varargin)
             
-            i = 4;       
             me.taper = taper; %#ok<CPROP>
             
+            %%% This loop sets options based on keyword arguments.
+            i = 4;       
            while i < length(varargin)
               switch lower(varargin{i})
                   
