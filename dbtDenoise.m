@@ -67,10 +67,14 @@ zlothresh = 3;
 makeplots = false;
 smoothing_method = 'polynomial';
 adjust_threshold = true; % If true this performs an initial denoising run at a higher threshold if an excessive number of frequency bands are rejected (>15 %)
-prefilter_threshold = 15; % Percent rejected bands needed to trigger prefiltering at a higher threshold
+prefilter_threshold = 10; % Percent rejected bands needed to trigger prefiltering at a higher threshold
 baseline_polyord = 10;
 smbw = 10;
+rm_edge_samples = 2; %Remove this many edge samples 
 i = 1;
+
+argin = varargin;
+
 while i <= length(varargin)
           switch lower(varargin{i})
 
@@ -106,7 +110,9 @@ while i <= length(varargin)
                  case {'spike opts'}  % option structure for spike exclusion (see SPIKEFILTER)
                     spike = varargin{i+1};
                     varargin(i:i+1) = [];
-                    spike.remove_spikes = true;
+                    if ~isfield(spike,'remove_spikes')
+                        spike.remove_spikes = true;
+                    end
                      i = i-1;
                 case {'zhithresh','high threshold'}  % coefficient threshold
                   zhithresh = varargin{i+1};
@@ -143,7 +149,11 @@ while i <= length(varargin)
                   
                   varargin(i:i+1) = []; 
                   i = i-1; 
-                  
+             case {'remove edge','rm edge'} 
+                  %Number of edge samples to remove
+                  rm_edge_samples = double(varargin{i+1});
+                  varargin(i:i+1) = []; 
+                  i = i-1;  
               otherwise
 %                  error('Unrecognized keyword %s',varargin{i})
           end
@@ -177,26 +187,29 @@ else
 end
 w = blsig.frequency;
 
-kt = kurtosis(abs(blsig.blrep));
+include_times = blsig.time >= rm_edge_samples./blsig.sampling_rate  ...
+               & blsig.time <= blsig.Norig./blsig.fullFS - rm_edge_samples./blsig.sampling_rate;
+
+kt = kurtosis(abs(blsig.blrep(include_times,:,:)));
 
 pcntrej = mean(kt>kurtosis_threshold);
 F0=1;
 if adjust_threshold && pcntrej > prefilter_threshold/100;
     fprintf('\n%0.0f%% bands flagged. Prefiltering with higher rejection threshold.\n    ',pcntrej*100)
-    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,varargin{:},'low threshold',2*zlothresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold);
-    kt = kurtosis(abs(blsig.blrep));
+    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,argin{:},'low threshold',2*zlothresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold,'spike opts',spike);
+    kt = kurtosis(abs(blsig.blrep(include_times,:,:)));
 
 end
 
 
 switch smoothing_method
     case 'polynomial'
-        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,baseline_polyord); %takes out the baseline by fitting a polynomial
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,baseline_polyord,include_times); %takes out the baseline by fitting a polynomial
     case 'moving_average'
-        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw); %takes out the baseline by fitting a polynomial
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw,include_times); %takes out the baseline by fitting a polynomial
         
 end
-mn = mean(abs(nsig));
+mn = mean(abs(nsig(include_times,:,:)));
 
 
 %%% Compute z-score for mean power
@@ -221,7 +234,7 @@ ln = z>zlothresh;  %%% Threshold the adjusted z
 P = abs(nsig);
 P(:,w<filter_above) = nan;
 P(:,ln) = nan;
-
+P(~include_times,:) = nan;
 %Compute zscore over all time-frequency points without including the potentially contaminated frequencies in the variance estimate
 Z = (abs(nsig)-mean(abs(nsig(~isnan(P)))))./std(abs(nsig(~isnan(P))));
 
@@ -229,6 +242,7 @@ Z = (abs(nsig)-mean(abs(nsig(~isnan(P)))))./std(abs(nsig(~isnan(P))));
 Z(:,w<filter_above) = 0;
 %Set threshold 
 LN = isnan(P) & Z > zlothresh | Z >zhithresh ;
+
 
 % % Smooth edges a little to reduce time-domain artifacts 
 % g = gausswin(ceil(.5./blsig.sampling_rate));
