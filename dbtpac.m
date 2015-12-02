@@ -115,7 +115,7 @@ end
 if isempty(phasebw)
     %%% If no other bandwidth is specified default to a reasonable value
     %%% based on the amplitude bandwidth.
-   phasebw = ampbw/length(dbamp.time)*400; 
+   phasebw = ampbw/length(dbamp.time)*100; 
 end
 
 if isempty(keep_time)

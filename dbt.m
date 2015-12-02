@@ -6,13 +6,10 @@ classdef dbt
 %
 %  B = dbt(X,Fs,BW)
 %
-%  X  - Signal as a column vector. If X is a matrix, each column is a separate
-%        signal.
+%  X  - Signal matrix with channels in columns. 
 %  Fs - Sampling frequency
 %  BW - Bandwidth of decomposition
 % 
-%
-%  B = dbt(X,Fs,Bw, ['option'], [value])
 %
 %  B is an object with the following properties:
 %
@@ -27,32 +24,31 @@ classdef dbt
 %               center frequency is negative or greater than nyquist.
 %   .bands: band limits for each frequency band.
 %   .taper: taper used to window frequency bands.
-%   .padding: whether signal duration is adjusted through time padding
-%             ('time') or fequency padding ('frequency').
 %   .fftpad: degree of oversampling achieved through fft padding. 1
 %            corresponds to 2x oversampling.
-%   .centerDC: If false (default), the fft of the DBT bands contains
+%   .centerDC: If false, the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
-%               otherwise each band is demodulated to be centered on DC.
+%               otherwise each band is demodulated to be centered on DC (default).
+%
 %   
+%  B = dbt(X,Fs,Bw, ['option'], [value])
 %
 %  Options:
 %
 %  	offset   -  offset of the first band from 0hz (default = 0)
-%   padding  - 'time' (default) or 'none': pad signal in the time domain to
-%                adjust bandwidth.
 %   shoulder - (0 - 1) degree of overlap between neighboring bands (default = 1). 
 %                  Note that, at present, 1 is the maximum allowable value.
 %
 %      The overlapping portions of the bands are windowed with a  taper:
 %              ____   __________   ________   _________
 %                  \ /	        \ /        \ /   
-%     .  .  .	  X              X          X           . . . 
+%    .  .  .	    X            X          X           . . . 
 %                  / \	        / \        / \
 %                  |-----------|           |-|
 %                   BW              shoulder
 %      
-%       By default,  the taper is defined so that squares sum to 1
+%       By default,  the taper is defined so that the square of overlapping
+%          regions sum to 1.
 %
 %  upsampleFx: upsample the frequency scale by a factor of (1+x) (default x
 %              = 0, no upsampling ).
@@ -76,7 +72,7 @@ classdef dbt
 %     C Kovach 2013 - 2015
 % 
 
-% Please cite: Kovach, Christopher and Phillip Gander. (submitted) The demodulated band transform.
+% Please cite: Kovach, Christopher and Phillip Gander. (submitted) The demodulated band transform. arXiv:1510.03113 [q-bio.QM]
 
     properties 
         
@@ -113,9 +109,10 @@ classdef dbt
     
         function me = dbt(varargin)
             
-            i = 4;       
             me.taper = taper; %#ok<CPROP>
             
+            %%% This loop sets options based on keyword arguments.
+            i = 4;       
            while i < length(varargin)
               switch lower(varargin{i})
                   
@@ -220,10 +217,11 @@ classdef dbt
             %%% divides padded duration 
             
 %             [~,den] = rat(bw/fs/2,me.bwtol);
-            stepsize = bw/(me.upsampleFx +1);           
+            stepsize = bw/(me.upsampleFx +1);   
+            
+            %%% Signal padding will ensure that the resulting bandwidth falls within some tolerance of the 
+            %%% target velue. Tolerance is determined by the bwtol property.
             [~,den] = rat(stepsize/fs/2,me.bwtol);
-
-           
            
            newn = ceil(n/den)*den;
            newT = newn/fs;
