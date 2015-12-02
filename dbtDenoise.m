@@ -78,6 +78,9 @@ baseline_polyord = 10;
 smbw = 10;
 rm_edge_samples = 2; %Remove this many edge samples 
 i = 1;
+
+argin = varargin;
+
 while i <= length(varargin)
           switch lower(varargin{i})
 
@@ -113,7 +116,9 @@ while i <= length(varargin)
                  case {'spike opts'}  % option structure for spike exclusion (see SPIKEFILTER)
                     spike = varargin{i+1};
                     varargin(i:i+1) = [];
-                    spike.remove_spikes = true;
+                    if ~isfield(spike,'remove_spikes')
+                        spike.remove_spikes = true;
+                    end
                      i = i-1;
                 case {'zhithresh','high threshold'}  % coefficient threshold
                   zhithresh = varargin{i+1};
@@ -197,7 +202,7 @@ pcntrej = mean(kt>kurtosis_threshold);
 F0=1;
 if adjust_threshold && pcntrej > prefilter_threshold/100;
     fprintf('\n%0.0f%% bands flagged. Prefiltering with higher rejection threshold.\n    ',pcntrej*100)
-    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,varargin{:},'low threshold',2*zlothresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold);
+    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,argin{:},'low threshold',2*zlothresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold,'spike opts',spike);
     kt = kurtosis(abs(blsig.blrep(include_times,:,:)));
 
 end
