@@ -49,6 +49,13 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %       
 % See also DBT, SPIKEFILTER
 
+% ----------- SVN REVISION INFO ------------------
+% $URL$
+% $Revision$
+% $Date$
+% $Author$
+% ------------------------------------------------
+
 % C Kovach 2013
 
 if nargin < 3 || isempty(bandwidth)

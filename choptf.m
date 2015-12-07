@@ -12,6 +12,13 @@ function [CH,tt,T] = choptf(trg,times,db,trref,normalization)
 %         For no normalization leave empty (default)
 % see also DBT
 
+% ----------- SVN REVISION INFO ------------------
+% $URL$
+% $Revision$
+% $Date$
+% $Author$
+% ------------------------------------------------
+
 %C. Kovach 2014
 
 if nargin < 5 || isempty(normalization)
