@@ -1,12 +1,16 @@
 function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 
 % Denoise using the demodulated band representation of a signal (see
-% DBT). A threshold is computed on the coefficients using a threshold on
-% kurtosis.
+% DBT). This works by applying a threshold to coefficients of the 
+% decomposition, discarding those whose magnitude exceeds the threshold
+% and reconstructing the denoised signal from the inverse DBT transform. 
+% The threshold is adjusted according to the location of sharp peaks in the
+% periodogram over the whole recording and the kurtosis within each band.
+% 
 %
 % Usage:
 %
-%   [xdn,filt,dbt] = dbtDenoise(x,Fs,bandwidth,[keyword],[value])
+%   [xdn,filt,dbx] = dbtDenoise(x,Fs,bandwidth,[keyword],[value])
 %
 %    Inputs:
 % 
@@ -19,7 +23,7 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 % 
 %       xdn   - denoised signal
 %       filt  - filter used on DBT coefficients in denoising  
-%       blsig - DBT of xdn
+%       dbx - DBT of xdn
 %
 %    Keyword options:
 %       
@@ -27,15 +31,16 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %                                before applying dbt-based denoising.
 %                         false - no spike removal
 %                         n (scalar) - remove spikes at specified threshold
-%                         Thresholding is applled iteratively to z-scores
-%                         across all remaining time points none remain above the threshold.
+%                             Thresholding is applied iteratively to z-scores
+%                             across all remaining time points none remain above 
+%                             the threshold (see SPIKEFILTER).
 %
 %       'kthresh'      :  kurtosis threshold. Coefficients in frequency bands for which
-%                         kurtosis over time falls above this value are
-%                         thresholded at 'zlothreshold' and otherwise at
-%                         'zhireshold'. This feature was added as
-%                         kurtosis is useful for detecting frequency
-%                         modulated line noise. Default = 10.
+%                             kurtosis over time falls above this value are
+%                             thresholded at 'zlothreshold' and otherwise at
+%                             'zhireshold'. This feature was added as
+%                             kurtosis is useful for detecting frequency
+%                             modulated line noise. Default = 10.
 %                         
 %      'zhithresh'     : Threshold for coefficient removal. (default=6)
 %       
@@ -45,12 +50,6 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 % See also DBT, SPIKEFILTER
 
 % C Kovach 2013
-% ----------- SVN REVISION INFO ------------------
-% $URL$
-% $Revision$
-% $Date$
-% $Author$
-% ------------------------------------------------
 
 if nargin < 3 || isempty(bandwidth)
    bandwidth = .05; % This seems to work well for constant line noise. For FM line noise try .25 or so. 
@@ -70,6 +69,7 @@ filter_above = 40;
 use_stft = false;
 zhithresh = 6;
 zlothresh = 3;
+flagthresh = 3;
 makeplots = false;
 smoothing_method = 'polynomial';
 adjust_threshold = true; % If true this performs an initial denoising run at a higher threshold if an excessive number of frequency bands are rejected (>15 %)
@@ -84,11 +84,7 @@ argin = varargin;
 while i <= length(varargin)
           switch lower(varargin{i})
 
-              case {'stft'}  % use stft instead of bld
-                  use_stft = true; 
-                  varargin(i) = [];
-                  %i = i-1;
-              case {'dbt'}  % use stft instead of dbt
+           case {'dbt'}  % use stft instead of dbt
                   use_stft = false;                        
                   varargin(i) = [];
                   %i = i-1;
@@ -127,7 +123,11 @@ while i <= length(varargin)
                 case {'zlothresh','low threshold'}  % Apply a lower threshold to frequencies above the kurtosis threshold
                   zlothresh = varargin{i+1};
                   varargin(i:i+1) = [];
-                  i = i-1;        
+                  i = i-1;   
+                case {'flagthresh','flag threshold'}  % Threshold baseline-corrected z score at which to identify bands as contaminated.
+                  flagthresh = varargin{i+1};
+                  varargin(i:i+1) = [];
+                  i = i-1;   
                 case {'makeplots'} 
                   makeplots = varargin{i+1};
                   varargin(i:i+1) = []; 
@@ -171,17 +171,6 @@ shoulder  = 1; %This is overridden if passed as an argument in varargin
 
 if spike.remove_spikes    
     [x,spike] = spikefilter(x,fs,spike);
-%     spks = false(size(x));
-%     newspks = true;
-%     while any(newspks)
-%        z = (x-mean(x(~spks)))/std(x(~spks));
-%        newspks = abs(z)>spike.threshold &~spks; 
-%        spks = newspks | spks;
-%     end
-%     win = hanning(ceil(spike.smoothwindow.*fs));
-%     spike.filter = exp(convn(log(1-spks+eps),win,'same'));
-%     spike.filter(spike.filter<0)=0;
-%     x = x.*spike.filter;
 end
 
 if ~use_stft
@@ -202,9 +191,8 @@ pcntrej = mean(kt>kurtosis_threshold);
 F0=1;
 if adjust_threshold && pcntrej > prefilter_threshold/100;
     fprintf('\n%0.0f%% bands flagged. Prefiltering with higher rejection threshold.\n    ',pcntrej*100)
-    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,argin{:},'low threshold',2*zlothresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold,'spike opts',spike);
+    [x,F0,blsig] = dbtDenoise(x,fs,bandwidth,argin{:},'low threshold',2*zlothresh,'flag threshold',2*flagthresh,'adjust threshold',true,'kthresh',2*kurtosis_threshold,'spike opts',spike);
     kt = kurtosis(abs(blsig.blrep(include_times,:,:)));
-
 end
 
 
@@ -226,16 +214,16 @@ z = nzsc(mn);
 z(w<filter_above) = nan;
 z(kt>kurtosis_threshold) = nan;
 
-while any(abs(z)>zlothresh)
+while any(abs(z)>flagthresh)
     
-    z(abs(z)>zlothresh) = nan;
+    z(abs(z)>flagthresh) = nan;
     
     z = nzsc(z);
     
 end
     
 z = (mn-mean(mn(~isnan(z))))./std(mn(~isnan(z)));
-ln = z>zlothresh;  %%% Threshold the adjusted z
+ln = z>flagthresh;  %%% Threshold the adjusted z
 
 P = abs(nsig);
 P(:,w<filter_above) = nan;
@@ -250,18 +238,11 @@ Z(:,w<filter_above) = 0;
 LN = isnan(P) & Z > zlothresh | Z >zhithresh ;
 
 
-% % Smooth edges a little to reduce time-domain artifacts 
-% g = gausswin(ceil(.5./blsig.sampling_rate));
-% g = g./max(g);
-% LN = convn(LN,g./sum(g),'same');
 
 F = (1-LN).*F0;
 
-% if makeplots
-%    [orig,bl] = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold); %takes out the baseline by fitting a polynomial
-%    orig = 10*log10(abs(nanmean(abs(orig).^2)))';
-% end
 
+%%% Apply the filter
 blsig.blrep = blsig.blrep.*F;
 
 xdn = blsig.signal;
@@ -270,9 +251,7 @@ xdn = xdn(1:length(x));
 
 
 if makeplots
-%    dnnsig = blsig.blrep.*repmat(exp(-bl),length(blsig.time),1); %takes out the baseline by fitting a polynomial
-%    pl = plot(blsig.frequency,[orig,20*log10(nanmean(abs(dnnsig).^2))']);
-   dnnsig = blsig.blrep; 
+%    dnnsig = blsig.blrep; 
    pl = plot(blsig.frequency,100*(1-mean(F))');
    if ~isequal(F0,1)
         hold on
