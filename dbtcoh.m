@@ -16,7 +16,7 @@ function [coh,csp,w,tt,dbs,trf,Pperm] =dbtcoh(x,y,varargin)
 % Computes event-related coherence by averaging over windows specified by
 % trigger and timerange. Trigger is a vector of event times and time range
 % is a vector, trange = [startt endt], specificying window onset and end
-% relative to events in trig. tt is a vector sample times for the window.
+% relative to events in trig. tt is a vector of sample times for the window.
 %
 % See also DBT
 
