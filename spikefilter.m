@@ -51,7 +51,7 @@ if nargin < 3
    spike.combine_channels =false; % If true, combine the filter across channels and apply the same filter to all channels.                              
 end
 
-DB_attenuation = 50; %Peak attenuation for an isolated impulse
+DB_attenuation = 100; %Peak attenuation for an isolated impulse
 
 xout = zeros(size(xin));
 if size(xin,2)<2
