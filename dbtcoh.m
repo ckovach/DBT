@@ -1,4 +1,4 @@
-function [coh,csp,w,tt,dbs,trf,Pperm] =dbtcoh(x,y,varargin)
+function [coh,csp,w,tt,dbs,trf,bias,Pperm] =dbtcoh(x,y,varargin)
 
 
 % coh =dbtcoh(x,y,fs,bw)
@@ -36,12 +36,13 @@ subtract_mean = true; % Subtract the average as with an ordinary correlation.
                        % This generally should make little difference on
                        % simple coherence analyses but may be important for
                        % event-related PAC.
-permtest = nargout>6; % Run a permutation test if true
+permtest = nargout>7; % Run a permutation test if true
 nperm = 200; % number of permutations
 
 dbtargs = {'remodphase',subtract_mean};
 
-
+% aPLV = false; %Compute amplitude-weighted phase locking rather than coherence.
+type  = 'coh';
 if nargin>3 && isnumeric(varargin{2}) && isnumeric(y)
     fs = varargin{1};
     bw = varargin{2};
@@ -70,6 +71,9 @@ while i <= length(varargin)
            subtract_mean = varargin{i+1};
            dbtargs = [dbtargs,{'remodphase',subtract_mean}]; %#ok<*AGROW>
            i = i+1;
+       case 'type'
+           type = varargin{i+1};
+           i = i+1;
        otherwise
            dbtargs = [dbtargs,varargin(i:i+1)]; 
            i=i+1;
@@ -78,6 +82,10 @@ while i <= length(varargin)
    i=i+1;
 end
 
+switch lower(type) 
+    case {'blplv','blpl'}
+        dbtargs = [dbtargs,{'centerDC',false,'remodphase',false}];
+end
 
 if ~isa(x,'dbt')
  
@@ -104,6 +112,12 @@ end
 
 if ~isa(x,'dbt')
     dbx = dbt(x,fs,bw,dbtargs{:});
+end
+
+switch lower(type) 
+    case {'blplv','blpl'}
+        dbx = blphase(dbx);
+        dby = blphase(dby);
 end
 
 if isempty(keep_time)
@@ -133,6 +147,7 @@ else
     AY = dby.blrep(keepT,:,:);
 end
 
+bias=[];
 
 for i = 1:length(dbx.frequency)
     
@@ -154,6 +169,12 @@ for i = 1:length(dbx.frequency)
             end
 
         end
+        
+        switch lower(type)
+            case {'blplv','blpl','plv'}
+                blx = blx./abs(blx);
+                    bly = bly./abs(bly);
+        end
         csp(:,:,i,t) = blx'*bly;
         
         if permtest
@@ -174,8 +195,18 @@ for i = 1:length(dbx.frequency)
             
         if isempty(y)
              coh(:,:,i,t) = diag(diag(csp(:,:,i,t).^-.5))*csp(:,:,i,t)*diag(diag(csp(:,:,i,t)).^-.5);
-        else          
-           coh(:,:,i,t) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
+        else     
+            switch lower(type)
+                case 'aplv'
+                     coh(:,:,i,t) = csp(:,:,i,t)./(abs(blx)'*abs(bly));
+                    % bias(:,:,i,t) = sqrt(sum((abs(blx).*abs(bly)).^2)./sum(abs(blx)'.*abs(bly)).^2);
+                     bias(:,:,i,t) = sqrt((abs(blx))'.^2*(abs(bly)).^2)./(abs(blx)'*abs(bly)).*sqrt(1 + 1/2*dbx.shoulder);%.*sqrt(1 + 1/2*dbx.shoulder);
+                case 'coh'
+                   coh(:,:,i,t) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
+                     bias(:,:,i,t) = sqrt(sum((abs(blx).*abs(bly)).^2)./(sum(abs(blx).^2).*sum(abs(bly).^2)));
+                case {'plv','blpl','blplv'}
+                    coh(:,:,i,t) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
+            end
         end
 
         if nargout > 5
@@ -184,7 +215,7 @@ for i = 1:length(dbx.frequency)
 %            trf(:,:,i,t) = diag(sum(abs(blx).^2))\(blx'*bly);
            trf(:,:,i,t) = (blx'*bly)/diag(sum(abs(bly).^2));
         end
-
+            
     end
 end
 

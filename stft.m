@@ -54,6 +54,10 @@ classdef stft
         lowpass = []; %%% Lowpass cutoff
 %        taperfun =[];
         taper = [];
+          twtol = 1e-8;    % 
+        upsampleTx = 0;
+        fftpad = 0;
+        times =[];
 %         taper = 'quadratic'; 
     end
     
@@ -88,6 +92,29 @@ classdef stft
                  case 'taper'  %Define a taper function. Default is (1-cos(x))/2
                       me.taperfun = varargin{i+1};
                       i = i+1;
+                case {'fftpad','upsamplefx'} % Pad by proportion of window size
+                      me.fftpad = varargin{i+1};
+                      i = i+1;
+                 case 'upsampletx' %Upsample time by proportion + 1 
+                      
+                      nx =  varargin{i+1};
+                    
+                      if nx ~= round(nx)
+                        warning('%s will not currently allow signals to be reconstructed with non-integer upsampling. Integer upsampling is recommended.',upper(mfilename))
+                      end
+            
+                      me.upsampleFx = nx;
+                      i = i+1;                      
+                                            
+                  
+                 case 'upsample' %Upsample time by proportion with fft padding and frequency by increasing overlap
+                      nx =  varargin{i+1}-1;
+                      me.fftpad = nx;
+                      me.upsampleTx = nx;
+                      if nx ~= round(nx)
+                          warning('%s will not currently allow signals to be reconstructed with non-integer upsampling. Integer upsampling is recommended.',upper(mfilename))
+                      end
+                      i = i+1;
                   otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
@@ -98,92 +125,89 @@ classdef stft
                return
            end
            
+        
+           fullsig  = varargin{1};
            fs  = varargin{2};
            tw =  varargin{3};
+
+           n = size(fullsig,1);
+           T = n./fs; % signal duration
 %            me.decim = decim;
            
-           
-           fullsig  = varargin{1};
-           
-           n = size(fullsig,1);
+            stepsize = tw/(me.upsampleTx +1);           
+        %    [nm,den] = rat(T./stepsize,me.twtol);
+     
            nchan = size(fullsig,2);
            
            me.Norig = n;
-           %Resample signal so that everything factors
-           %Keeping signal duration fixed and allowing bandwidth and sampling
-           %rate to vary.
            
-           T = n./fs; % signal duration
 %            timewindows = 0:tw-me.shoulder:T-tw;
         
-           newtwn = ceil(tw*fs);
+           
+           nstepsize = ceil(stepsize*fs);
+           stepsize = nstepsize./fs;
+           newT = ceil(T./stepsize)*stepsize;
+           newn = newT.*fs;
+           newtw = stepsize.*(me.upsampleTx+1);
+                    
+           winN = round(fs*newtw);
+           
+           
            nsh = round(me.shoulder*tw*fs);
-           newtw = newtwn./fs;
-           
-           K = ceil(T/(newtw)); 
-           M = newtwn+nsh;
-           newn = ceil(K*newtwn)+nsh;
-            
-           switch padding
-               case 'time'
-                  T = newn./fs;
-                 fullsig(newn) = 0; 
-              
+         
+           upratio = me.upsampleTx+1;
+           stepsize = newtw/upratio;
+           nstepsize = round(stepsize.*fs);
                  
-               case 'frequency'
-                   
-                   
-           
-           end
+      
            
            me.fullN = newn;
            %%% Likewise for new sampling frequency
-           newfs = newn./T;
+           newfs = newn./newT;
            me.fullFS = newfs;
            
            
-           nwin = K;
-           winN = M;
-         
-           
-           
-           if me.shoulder == 0
-               Xrs = reshape(fullsig,winN,nwin,nchan);
-           else
-              
-%                nsh = ceil(me.shoulder*newtw.*newfs);
-               me.shoulder = nsh/newfs/newtw;
-               rsmat =  repmat((0:nwin-1)*(winN-nsh),winN,1) + repmat((1:winN)',1,nwin);
-               tp = me.taper.make((1:1:nsh)/nsh); 
-               invtaper = me.taper.make(1-(1:1:nsh)/nsh);
-               
-               for k = 1:nchan
-                   Xrs(:,:,k) = double(fullsig(rsmat));
+           me.times(:,1) = (0:stepsize:newT - stepsize);%-newfs/newn;
+           me.times(:,2) = me.times(:,1)+newtw*(1+me.shoulder);%+newfs/newn;
+           nwin =size(me.times,1);
 
-                   %%% Now add the taper
-    %                Frs(end+(1-nsh:0),1:nwin-1) = diag(sparse(taper))*Frs(end+(1-nsh:0),1:nwin-1);
-                   Xrs(end+(1-nsh:0),1:nwin-1,k) = diag(sparse(tp))*Xrs(end+(1-nsh:0),1:nwin-1);
+           %%% Reshaping matrix. This step includes the initial
+           %%% circular shift.
+           rsmat =  repmat((0:nwin-1)*nstepsize,round(winN*(1+me.shoulder)),1) +...
+                   repmat((1:round(winN*(1+me.shoulder)))',1,nwin);% -nsh;
+           
+           fullsig(end+1:max(rsmat(:)),:,:)=0;           
+           %dcindx = find(rsmat==1);
 
-                   %%% subptract the tapered component from the next band
-                   Xrs(1:nsh,2:nwin,k) = diag(sparse(invtaper))*Xrs(1:nsh,2:nwin); % - Frs(end+(1-nsh:0),1:nwin-1);
-                   winN = size(Xrs,1);
+             tp = me.taper.make((0:1:nsh-1)/nsh); 
+            invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+        
+           
+           for  k = 1:nchan
+                x = fullsig(:,k);
+               Xrs(:,:,k) = double(x(rsmat));
+               if nsh>0
+                    Xrs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Xrs(end+(1-nsh:0),1:nwin,k);
+
+                   Xrs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Xrs(1:nsh,1:nwin,k); 
                end
+              
            end
-           Xrs(2*end,:,:) = 0;
-%            me.nyqval = newF(newn/2+1);
-           
-%            Frs(winN*2,:) = 0;
+           padN = floor((me.fftpad+1)*winN*(1+me.shoulder));
+           me.fftpad = 1/(1+me.shoulder)*padN/winN-1;
+      
+           Xrs(end+1:padN,:,:) =0; 
            Frs = fft(Xrs);
            me.blrep = permute(2*Frs(1:end/2,:,:),[2 1 3]);
            me.blrep(:,1,:) = Frs(1,:,:);
            
-           me.sampling_rate = nwin/T;
+           me.sampling_rate = nwin/newT;
            
                               
            me.timewindow = newtw;
-           me.windows = [0:newtw:me.lowpass-newtw;(newtw:newtw:T)]';
-           me.time = ((1:size(me.blrep,1))-.5)*T./size(me.blrep,1);
-           w = (0:winN-1)./winN*newfs/2;          
+           me.windows = [0:newtw:me.lowpass-newtw;(newtw:newtw:newT)]';
+           me.time = mean(me.times,2);
+           w = (0:padN-1)./padN*newfs/2;          
            me.frequency = w;
            
         end

@@ -46,13 +46,14 @@ csd =[];
 cohargs = {};
 dbtargs = {};
 do_permtest = false;
+aPLV = false;
 % if nargin <3 && isa(X,'dbt')
 %     fs = X.fullFS;
 % end
 % phasefs=fs;
 
 i = 1;
-while i < length(varargin)
+while i <= length(varargin)
     
    switch varargin{i}
        
@@ -102,6 +103,8 @@ while i < length(varargin)
        case 'do_permtest'
            do_permtest = varargin{i+1};
            i = i+1;
+        case {'plv','blplv','blpl','aplv','coh'}
+           cohargs = [cohargs,{'type',varargin{i}}];
        otherwise
            error('Unrecognized keyword %s',varargin{i})
    end
@@ -142,7 +145,7 @@ for k = 1:length(dbamp.frequency)
     elseif do_permtest
          [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
     else
-        [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
+        [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:)).^2),ampfs,phargs{:},cohargs{:});        
     end
     if get_csd
         csd(:,:,k,:,:) = c;
