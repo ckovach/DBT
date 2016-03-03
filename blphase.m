@@ -11,8 +11,15 @@ function [dbout,PH,dbx]=blphase(x,fs,bw,varargin)
 % original sampling rate.
 %%
 tol=1e-5;
+shoulder = 1;
+if isa(x,'dbt')
+    fs = x.FSorig;
+    bw = x.bandwidth;
+    shoulder = x.shoulder;
+    x = x.signal;
+end
 % DBT with hilbert equivalent trsfm
-dbx = dbt(x,fs,bw,'centerdc',false,'shoulder',0,varargin{:});
+dbx = dbt(x,fs,bw,'centerdc',false,'shoulder',shoulder,varargin{:});
 
 S = dbx.blrep./abs(dbx.blrep);
 
