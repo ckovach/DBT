@@ -58,5 +58,5 @@ if nargout > 1
     for k = 1:length(dbout.frequency), 
         PH(:,k)=dbout.signal(k,1);
     end    
+    PH=PH./abs(PH);
 end
-PH=PH./abs(PH);
