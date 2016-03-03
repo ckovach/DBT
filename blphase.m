@@ -13,14 +13,18 @@ function [dbout,PH,dbx]=blphase(x,fs,bw,varargin)
 tol=1e-5;
 shoulder = 1;
 if isa(x,'dbt')
-    fs = x.FSorig;
-    bw = x.bandwidth;
-    shoulder = x.shoulder;
-    x = x.signal;
+%     fs = x.FSorig;
+%     bw = x.bandwidth;
+%     shoulder = x.shoulder;
+%     x = x.signal;
+   if x.centerDC
+       error('DBT input must have centerDC = false')     
+   end
+    dbx = x;
+else
+    % DBT with hilbert equivalent trsfm
+    dbx = dbt(x,fs,bw,'centerdc',false,'shoulder',shoulder,varargin{:});
 end
-% DBT with hilbert equivalent trsfm
-dbx = dbt(x,fs,bw,'centerdc',false,'shoulder',shoulder,varargin{:});
-
 S = dbx.blrep./abs(dbx.blrep);
 
 niter=0;
