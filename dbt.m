@@ -72,7 +72,7 @@ classdef dbt
 %     C Kovach 2013 - 2015
 % 
 
-% Please cite: Kovach, Christopher and Phillip Gander. (submitted) The demodulated band transform. arXiv:1510.03113 [q-bio.QM]
+% Please cite: C. K. Kovach, P. E. Gander, The demodulated band transform. Journal of Neuroscience Methods 261, 135-154 (2016).
 
     properties 
         
