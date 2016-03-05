@@ -230,7 +230,7 @@ classdef dbt
            newn = ceil(n/den)*den;
            newT = newn/fs;
            
-           winN = round(bw*newT);
+           winN = round(bw*newT/2)*2;
            newbw = winN/newT;
            
 
