@@ -31,9 +31,9 @@ function [blout,w0,time,dbif] = dbtfocus(dbx,focus_factor, upsample_factor)
 %
 % Example:  
 %   
-%
-%   x = randn(1e4,1) + chirp((1:1e4)'/1e3,0,10,100,'quadratic') + cos(2*pi*(1:1e4)'/1e3*50);
-%   dbx = dbt(x,1000,10,'centerDC',false,'upsampleFx',3,'lowpass',100);
+%  
+%   x = randn(1e4,1) + chirp((1:1e4)'/1e3,10,5,50,'logarithmic') + cos(2*pi*(1:1e4)'/1e3*50);
+%   dbx = dbt(x,1000,10,'centerDC',false,'upsampleFx',4,'lowpass',100);
 %   [tf,freq,time,IF] = dbtfocus(dbx,4,2);
 %   figure, subplot(2,1,1)
 %   dbx.specgram;
@@ -85,11 +85,11 @@ else
     dbphn.blrep = dbx.blrep./abs(dbx.blrep);
 end
 
-blout=zeros(length(dbx.time),length(w0));
+blout=zeros([length(dbx.time),length(w0),size(dbx.blrep,3)]);
 
 
 %%% Get instantaneous frequency.
-dbif = arg(dbphn.blrep(1:end,:).*conj(dbphn.blrep([1 1:end-1],:)))/pi*dbx.sampling_rate/2;
+dbif = arg(dbphn.blrep(1:end,:,:).*conj(dbphn.blrep([1 1:end-1],:,:)))/pi*dbx.sampling_rate/2;
 
 for k = 1:length(dbx.frequency)
         
@@ -97,14 +97,14 @@ for k = 1:length(dbx.frequency)
     
     
     %%% Gaussian weighting 
-    IFmap = exp(-((repmat(w(1:length(wi)),size(dbif,1),1)-repmat(dbif(:,k),1,length(wi))).*focus_factor./dbx.bandwidth).^2);
+    IFmap = exp(-((repmat(w(1:length(wi)),[size(dbif,1),1,size(dbif,3)])-repmat(dbif(:,k,:),1,length(wi))).*focus_factor./dbx.bandwidth).^2);
     
-    blout(:,wi) = blout(:,wi)...
-         +  IFmap.*(abs(dbx.blrep(:,k))*win(1:length(wi)).^2);
+    blout(:,wi,:) = blout(:,wi,:)...
+         +  IFmap.*repmat(abs(dbx.blrep(:,k,:)),1,length(wi)).*repmat(win(1:length(wi)).^2,[length(dbx.time) 1 size(dbx.blrep,3)]);
 end
 
 time = dbphn.time;
 
 if nargout > 3
-    dbif = dbif + ones(size(dbif,1),1)*dbx.bands(:,1)';
+    dbif = dbif + repmat(ones(size(dbif,1),1)*dbx.bands(:,1)',[1 1 size(dbif,3)]);
 end

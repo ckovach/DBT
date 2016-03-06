@@ -9,7 +9,12 @@ function [dbout,PH,dbx]=blphase(x,fs,bw,varargin)
 % dbout is a dbt object containing the normalized signal. H contains
 % the reconstructed and amplitude normalized signal for each band at the
 % original sampling rate.
-%%
+%
+%
+
+% C Kovach 2016
+
+
 tol=1e-4;
 shoulder = 1;
 if isa(x,'dbt')
