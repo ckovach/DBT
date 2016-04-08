@@ -15,7 +15,7 @@ function [dbout,PH,dbx]=blphase(x,fs,bw,varargin)
 % C Kovach 2016
 
 
-tol=1e-4;
+tol=1e-5;
 shoulder = 1;
 if isa(x,'dbt')
 %     fs = x.FSorig;

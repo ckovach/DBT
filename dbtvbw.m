@@ -111,6 +111,8 @@ classdef dbtvbw
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
                             % correct average when averaging the raw spectrum over time.
           padding = 'time'; % Options are 'time' or 'none'; 'frequency' is obsolete.
+         inputargs = {};
+ 
     end    
     
     methods
@@ -205,6 +207,8 @@ classdef dbtvbw
            n = size(fullsig,1);
            ncol = size(fullsig,2);
            
+           me.inputargs = varargin(3:end);
+        
            me.Norig = n;
            
             nnyq = ceil((n+1)/2);
@@ -226,7 +230,7 @@ classdef dbtvbw
            ncs = floor(min(cfreq0)*n/2);
            wcs = circshift(w,[0,-ncs]);
        
-           for k = 1:me.upsampleFx+1
+           for k = 1:me.upsampleFx+2
          
                cfrq = cfreq0(1:end-1) + diff(cfreq0)*(k-1)./(me.upsampleFx+1);            
                frqscale(:,k) = mod(interp1(cfrq,1:length(cfrq),wcs,'linear'),1);

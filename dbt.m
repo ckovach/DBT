@@ -109,6 +109,7 @@ classdef dbt
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
                             % correct average when averaging the raw spectrum over time.
           padding = 'time'; % Options are 'time' or 'none'; 'frequency' is obsolete.
+        inputargs = {};
     end    
     
     methods
@@ -190,9 +191,9 @@ classdef dbt
            end
            
            fs  = varargin{2};
-           bw =  varargin{3};
-           
+           bw =  varargin{3};           
            fullsig  = varargin{1};
+           me.inputargs = varargin(4:end);
            
            n = size(fullsig,1);
            ncol = size(fullsig,2);
@@ -268,7 +269,7 @@ classdef dbt
 %         foffset = me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize;
            % This adjusts the high-pass offset so it is an integer multiple of
            % frequency sampling
-           foffset = floor((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
+           foffset = ceil((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
            noffset = round(foffset*newT );
            foffset=noffset/newT;
            me.offset = foffset + newbw*(1+me.shoulder)/2;

@@ -32,6 +32,12 @@ keep_time=[];
 trigger = [];
 timerange=[];
 tt=0;
+rm0lag = false; %remove zero phase lag component through a frequency domain highpass filter
+                % If rm0lag = true, then subtracts the mean from the cross
+                % spectrum over frequencies.
+                % If rm0lag is a real scalar, then rm0lag applies a
+                % 'highpass' frequency domain filter, removing the
+                % contribution within a time lag of the given value.
 subtract_mean = true; % Subtract the average as with an ordinary correlation.
                        % This generally should make little difference on
                        % simple coherence analyses but may be important for
@@ -88,6 +94,9 @@ end
 switch lower(type) 
     case {'blplv','blpl'}
         dbtargs = [dbtargs,{'centerDC',false,'remodphase',false}];
+    case {'icplv'}
+        dbtargs = [dbtargs,{'remodphase',true}];
+        
 end
 
 if ~isa(x,'dbt')
@@ -181,6 +190,10 @@ for i = 1:length(dbx.frequency)
             case {'blplv','blpl','plv'}
                 blx = blx./abs(blx);
                     bly = bly./abs(bly);
+            case {'icplv'}
+                blx = itercent(blx./abs(blx));
+                bly = itercent(bly./abs(bly));
+                
         end
         csp(:,:,i,t) = blx'*bly;
         
@@ -194,15 +207,18 @@ for i = 1:length(dbx.frequency)
              coh(:,:,i,t,permi) = diag(diag(csp(:,:,i,t).^-.5))*csp(:,:,i,t)*diag(diag(csp(:,:,i,t)).^-.5);
         else     
             switch lower(type)
-                case 'aplv'
+                case {'awplv','aplv'}
                      coh(:,:,i,t,permi) = csp(:,:,i,t)./(abs(blx)'*abs(bly));
                     % bias(:,:,i,t) = sqrt(sum((abs(blx).*abs(bly)).^2)./sum(abs(blx)'.*abs(bly)).^2);
                      bias(:,:,i,t,permi) = sqrt((abs(blx))'.^2*(abs(bly)).^2)./(abs(blx)'*abs(bly)).*sqrt(1 + 1/2*dbx.shoulder);%.*sqrt(1 + 1/2*dbx.shoulder);
                 case 'coh'
                    coh(:,:,i,t,permi) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
                      bias(:,:,i,t,permi) = sqrt(sum((abs(blx).*abs(bly)).^2)./(sum(abs(blx).^2).*sum(abs(bly).^2)));
-                case {'plv','blpl','blplv'}
+                case {'plv','blpl','blplv','icplv'}
                     coh(:,:,i,t,permi) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
+                otherwise 
+                    error('Unrecognized type %s',type)
+  
             end
         end
 
@@ -225,5 +241,15 @@ if nargout > 4
     end
 end
 
+%%%%
+function q = itercent(q)
+
+N = 10;
+
+for k = 1:N, 
+    q = q-repmat(mean(q),[size(q,1) 1 1]); 
+    q=q./abs(q); 
+%    Q(:,k) = q; 
+end
 
 
