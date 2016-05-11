@@ -270,7 +270,7 @@ classdef dbt
            % This adjusts the high-pass offset so it is an integer multiple of
            % frequency sampling
            foffset = ceil((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
-           noffset = round(foffset*newT );
+           noffset = floor(foffset*newT );
            foffset=noffset/newT;
            me.offset = foffset + newbw*(1+me.shoulder)/2;
            
@@ -501,9 +501,11 @@ classdef dbt
                      nofs = round((me.bands(upsi,1) + me.bandwidth*me.shoulder)*T);
                      %%% Reconstruct signal, averaging over the oversampled
                      %%% bands.
-                     Ffull( 1 + mod(nofs + (1:numel(f))-1,me.fullN),k) =...
-                        Ffull( 1 + mod(nofs + (1:numel(f))-1,me.fullN),k)...
-                        + f(:) * sqrt(me.fullN)/sqrt(upratio);
+                    fillindx =  nofs + (1:numel(f))'-1;
+                    fillindx = 1+mod(fillindx(fillindx-fillindx(1)<me.fullN),me.fullN);
+                     Ffull(  fillindx,k) =...
+                        Ffull(  fillindx,k)...
+                        + f(true(size(fillindx))) * sqrt(me.fullN)/sqrt(upratio);
                end
                if ~mod(me.fullN,2)
                   Ffull(ceil(me.fullN/2+1),k) = Ffull(ceil(me.fullN/2+1),k)/2;
@@ -525,7 +527,7 @@ classdef dbt
             
         end
        %%%%
-        function varargout = specgram(me,normalize)
+        function varargout = specgram(me,normalize,varargin)
             if nargin < 2
                 normalize = 0;
             end
@@ -534,12 +536,20 @@ classdef dbt
             else
                 fun = @(x)x.blrep;
             end
-            S = 20*log10(abs(fun(me)))';
+            S = 20*log10(abs(fun(me)));
             t = me.time;
             w = me.frequency;
             if nargout == 0
-               imagesc(t,w,S) 
-               axis xy
+               if size(S,3)==1
+                 imagesc(t,w,S') 
+                 axis xy
+               else
+                 ax = nimagesc(permute(S,[2 1 3]),varargin{:});
+                 c = get(ax,'children');
+                 set([c{:}],'xdata',t,'ydata',w)
+                 axis(ax,'on')
+                 set(ax,'xlim',minmax(t),'ylim',minmax(w))
+               end
             else
                 varargout(1:3) = {S,t,w};
             end
