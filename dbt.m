@@ -219,7 +219,7 @@ classdef dbt
                    me.bwtol = Inf;
            end
                    
-            %%% Pad signal in time so that bandwidth is approximately
+            %%% Pad signal in time so that bandwidth sapproximately
             %%% divides padded duration duration
             
 %             [~,den] = rat(bw/fs/2,me.bwtol);
