@@ -6,7 +6,7 @@ function [T,t,Err] = chopper(rg,evtt,fs)
 %
 % Creates a matrix to segment a signal sampled at fs into windows ranging from rg(1) to
 % rg(end) around event times specified in evtt.
-5
+%
 % INPUT VARIABLES:
 %
 %  rg: 2 element array containing start and end times (e.g. -0.5 to 1.0) in seconds
