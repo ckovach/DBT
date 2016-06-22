@@ -57,7 +57,7 @@ while i <= length(varargin)
     
    switch varargin{i}
        
-       case 'phasebw'
+       case {'phasebw','phbw'}
            phasebw = varargin{i+1};
            i = i+1;
        
@@ -105,6 +105,9 @@ while i <= length(varargin)
            i = i+1;
         case {'plv','blplv','blpl','aplv','coh'}
            cohargs = [cohargs,{'type',varargin{i}}];
+        case {'cohargs'}
+           cohargs = [cohargs,varargin{i+1}];
+           i = i+1;
        otherwise
            error('Unrecognized keyword %s',varargin{i})
    end
@@ -141,14 +144,14 @@ fprintf('\nBand: %4i',0)
 for k = 1:length(dbamp.frequency)   
     fprintf('\b\b\b\b%4i',k)
     if get_trf
-        [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});
+        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});
     elseif do_permtest
-         [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
+         [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
     else
-        [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:)).^2),ampfs,phargs{:},cohargs{:});        
+        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:)).^2),ampfs,phargs{:},cohargs{:});        
     end
     if get_csd
-        csd(:,:,k,:,:) = c;
+        csd(:,:,k,:,:,:) = c;
     end
 end
 

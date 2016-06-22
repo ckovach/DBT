@@ -35,6 +35,12 @@ end
 adjust_phase = db.remodphase; %Correct phase for rounding error
                               %if phase information is preserved.
                               
+if db.gpuEnable
+    gpuarg ={'gpuArray'};
+else
+    gpuarg ={};
+end
+
 [T,tt,Err]= chopper(trg,times,db.sampling_rate);
 
 Err(T<1|T>length(db.time)) = 0;
@@ -57,7 +63,7 @@ end
 
 x = ones(length(db.time)+1,1);
 nch = size(db.blrep,3);
-CH = zeros([length(tt),length(db.frequency),size(T,2), nch]);
+CH = zeros([length(tt),length(db.frequency),size(T,2), nch],gpuarg{:});
 for i = 1:nch
     for k = 1:length(db.frequency)
 

@@ -31,6 +31,7 @@ i = 1;
 keep_time=[];
 trigger = [];
 timerange=[];
+event_type = [];
 tt=0;
 rm0lag = false; %remove zero phase lag component through a frequency domain highpass filter
                 % If rm0lag = true, then subtracts the mean from the cross
@@ -47,8 +48,12 @@ nperm = 0; % number of permutations
 
 dbtargs = {'remodphase',subtract_mean};
 
+gpuEnable = false;
+
 % aPLV = false; %Compute amplitude-weighted phase locking rather than coherence.
 type  = 'coh';
+resolve_time = true;
+
 if nargin>3 && isnumeric(varargin{2}) && isnumeric(y)
     fs = varargin{1};
     bw = varargin{2};
@@ -83,6 +88,15 @@ while i <= length(varargin)
        case 'permtest'
            nperm = varargin{i+1};
            i = i+1;
+       case 'conditions'
+           event_type = varargin{i+1};
+           i = i+1;
+       case 'resolve time'
+           resolve_time = varargin{i+1};
+           i = i+1;
+       case 'gpu'
+           gpuEnable = varargin{i+1};
+           i = i+1;
        otherwise
            dbtargs = [dbtargs,varargin(i:i+1)]; 
            i=i+1;
@@ -90,6 +104,8 @@ while i <= length(varargin)
    
    i=i+1;
 end
+
+gpuEnable = gpuEnable && gpuDeviceCount >0;
 
 switch lower(type) 
     case {'blplv','blpl'}
@@ -106,6 +122,15 @@ if ~isa(x,'dbt')
 else
     dbx = x;
     nx = size(dbx.blrep,3);
+    gpuEnable = gpuEnable || dbx.gpuEnable; % Enable if dbt object is already GPU enabled. 
+    
+end
+
+if gpuEnable
+   dbtargs = [dbtargs,{'gpu',true}]; 
+   gpuarg = {'gpuArray'};
+else
+    gpuarg = {};
 end
 
  dby = [];
@@ -117,10 +142,12 @@ if ~isempty(y) && (~isscalar(y) || isa(y,'dbt'))
     else
         dby = y;
         ny = size(dby.blrep,3);
+
     end
 else
     ny = nx;    
 end
+
 
 if ~isa(x,'dbt')
     dbx = dbt(x,fs,bw,dbtargs{:});
@@ -143,23 +170,34 @@ else
 end
 
 w = dbx.frequency;
-csp = zeros(nx,ny,length(w));
-coh = csp;
+csp = zeros(nx,ny,length(w),gpuarg{:});
+
 if nargout > 4
     trf = csp;
 end
 
-if ~isempty(timerange)
+if ~isempty(timerange) 
    [AX,tt] =  choptf(timerange,trigger,dbx);
    if ~isempty(y)
        [AY,tt] =  choptf(timerange,trigger,dby);
    end
 else
+    unqev =0;
     AX = dbx.blrep(keepT,:,:);
     AY = dby.blrep(keepT,:,:);
 end
 
-bias=[];
+if isempty(event_type)
+    event_type = zeros(size(tt));
+end
+[unqev,~,unqi] = unique(event_type);
+ 
+% bias= zeros(nx,ny,length(w),gpuarg{:});
+
+coh = zeros([nx,ny,length(w),length(tt),length(unqev),length(nperm)+1],gpuarg{:});
+if nargout > 6
+    bias = zeros([nx,ny,length(w),length(tt),length(unqev),length(nperm)+1],gpuarg{:});
+end
 for permi = 1:nperm+1
      if  permi>1
              nt = size(AX,1);
@@ -169,6 +207,7 @@ for permi = 1:nperm+1
 for i = 1:length(dbx.frequency)
     
     for t = 1:length(tt)
+       for k = 1:length(unqev)
         if isempty(timerange)
             blx = squeeze(AX(:,i,:));
             if isempty(y)
@@ -177,13 +216,26 @@ for i = 1:length(dbx.frequency)
                 bly = squeeze(AY(:,i,:));
             end
         else
-            blx = squeeze(AX(t,i,:,:));
-            if isempty(y)
-                bly = blx;
-            else
-                bly = squeeze(AY(t,i,:,:));
-            end
+            if resolve_time
+            
+             blx = squeeze(AX(t,i,event_type == unqev(k),:));
 
+                 if isempty(y)
+                    bly = blx;
+                else
+    %                 bly = squeeze(AY(:,i,:));
+                  bly = squeeze(AY(t,i,event_type == unqev(k),:));
+                 end
+            else
+                  blx = reshape(AX(:,i,event_type == unqev(k),:),[size(AX,1)*size(AX,3), size(AX,4) 1]) ;
+                 if isempty(y)
+                    bly = blx;
+                 else
+                    bly = reshape(AY(:,i,event_type == unqev(k),:),[size(AY,1)*size(AY,3), size(AY,4) 1]) ;
+
+                 end
+            end
+                       
         end
         
         switch lower(type)
@@ -195,27 +247,31 @@ for i = 1:length(dbx.frequency)
                 bly = itercent(bly./abs(bly));
                 
         end
-        csp(:,:,i,t) = blx'*bly;
+        csp(:,:,i,t,k) = blx'*bly;
         
        
         
         if subtract_mean
-                 csp(:,:,i,t,permi) = csp(:,:,i,t) - sum(blx)'*mean(bly);
+                 csp(:,:,i,t,k) = csp(:,:,i,t,k) - sum(blx)'*mean(bly);
         end
             
         if isempty(y)
-             coh(:,:,i,t,permi) = diag(diag(csp(:,:,i,t).^-.5))*csp(:,:,i,t)*diag(diag(csp(:,:,i,t)).^-.5);
+             coh(:,:,i,t,k,permi) = diag(diag(csp(:,:,i,t,k).^-.5))*csp(:,:,i,t,k)*diag(diag(csp(:,:,i,t,k)).^-.5);
         else     
             switch lower(type)
                 case {'awplv','aplv'}
-                     coh(:,:,i,t,permi) = csp(:,:,i,t)./(abs(blx)'*abs(bly));
-                    % bias(:,:,i,t) = sqrt(sum((abs(blx).*abs(bly)).^2)./sum(abs(blx)'.*abs(bly)).^2);
-                     bias(:,:,i,t,permi) = sqrt((abs(blx))'.^2*(abs(bly)).^2)./(abs(blx)'*abs(bly)).*sqrt(1 + 1/2*dbx.shoulder);%.*sqrt(1 + 1/2*dbx.shoulder);
+                     coh(:,:,i,t,k,permi) = csp(:,:,i,t,k)./(abs(blx)'*abs(bly));
+                    % bias(:,:,i,t,k) = sqrt(sum((abs(blx).*abs(bly)).^2)./sum(abs(blx)'.*abs(bly)).^2);
+                   if nargout > 6
+                       bias(:,:,i,t,k,permi) = sqrt((abs(blx))'.^2*(abs(bly)).^2)./(abs(blx)'*abs(bly)).*sqrt(1 + 1/2*dbx.shoulder);%.*sqrt(1 + 1/2*dbx.shoulder);
+                   end
                 case 'coh'
-                   coh(:,:,i,t,permi) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
-                     bias(:,:,i,t,permi) = sqrt(sum((abs(blx).*abs(bly)).^2)./(sum(abs(blx).^2).*sum(abs(bly).^2)));
+                   coh(:,:,i,t,k,permi) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t,k)*diag(sum(abs(bly).^2).^-.5);
+                    if nargout > 6
+                        bias(:,:,i,t,k,permi) = sqrt(abs(blx)'.^2*abs(bly).^2)./(abs(blx)'*abs(bly)).*sqrt(1 + 1/2*dbx.shoulder);
+                    end
                 case {'plv','blpl','blplv','icplv'}
-                    coh(:,:,i,t,permi) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t)*diag(sum(abs(bly).^2).^-.5);
+                    coh(:,:,i,t,k,permi) = diag(sum(abs(blx).^2).^-.5)*csp(:,:,i,t,k)*diag(sum(abs(bly).^2).^-.5);
                 otherwise 
                     error('Unrecognized type %s',type)
   
@@ -225,14 +281,15 @@ for i = 1:length(dbx.frequency)
         if nargout > 5
 %             cblx = blx-repmat(mean(blx),size(blx,1),1);
 %             cbly = bly-repmat(mean(bly),size(bly,1),1);
-%            trf(:,:,i,t) = diag(sum(abs(blx).^2))\(blx'*bly);
-           trf(:,:,i,t,permi) = (blx'*bly)/diag(sum(abs(bly).^2));
+%            trf(:,:,i,t,k) = diag(sum(abs(blx).^2))\(blx'*bly);
+           trf(:,:,i,t,k,permi) = (blx'*bly)/diag(sum(abs(bly).^2));
         end
             
+       end
     end
 end
 end
-    
+
 if nargout > 4
     if isequal(x,y)
         dbs = dbx;
