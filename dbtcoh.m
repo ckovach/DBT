@@ -194,9 +194,9 @@ end
  
 % bias= zeros(nx,ny,length(w),gpuarg{:});
 
-coh = zeros([nx,ny,length(w),length(tt),length(unqev),length(nperm)+1],gpuarg{:});
+coh = zeros([nx,ny,length(w),length(tt),length(unqev),nperm+1],gpuarg{:});
 if nargout > 6
-    bias = zeros([nx,ny,length(w),length(tt),length(unqev),length(nperm)+1],gpuarg{:});
+    bias = zeros([nx,ny,length(w),length(tt),length(unqev),nperm+1],gpuarg{:});
 end
 for permi = 1:nperm+1
      if  permi>1
