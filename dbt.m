@@ -104,7 +104,7 @@ classdef dbt
                           % frequencies, which halves the number of
                           % samples.
                           
-       gpuEnable = false; % Use GPU processor if available;
+       gpuEnable = []; % Use GPU processor if available;
          bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
@@ -117,10 +117,16 @@ classdef dbt
     
         function me = dbt(varargin)
             
-            i = 4;       
             me.taper = taper; %#ok<CPROP>
             
-           while i < length(varargin)
+            try % Use gpu by default when possible
+                me.gpuEnable = gpuDeviceCount>0;
+            catch
+                me.gpuEnable = false;
+            end
+            
+            i = 4;       
+            while i < length(varargin)
               switch lower(varargin{i})
                   
                   case {'offset','highpass'}
