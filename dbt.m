@@ -104,6 +104,7 @@ classdef dbt
                           % frequencies, which halves the number of
                           % samples.
                           
+       gpuEnable = false; % Use GPU processor if available;
          bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
@@ -180,6 +181,9 @@ classdef dbt
                   case 'bwtol'
                       me.bwtol = varargin{i+1};
                       i=i+1;
+                  case 'gpu'
+                      me.gpuEnable = varargin{i+1};
+                      i=i+1;
                    otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
@@ -188,6 +192,17 @@ classdef dbt
                
            if isempty(varargin)
                return
+           end
+           
+           if me.gpuEnable && gpuDeviceCount==0               
+               warning('No GPU device detected. Switching to non-GPU mode')
+               me.gpuEnable = false;
+           end
+           
+           if me.gpuEnable
+               gpuarg = {'gpuArray'};
+           else
+               gpuarg = {};
            end
            
            fs  = varargin{2};
@@ -312,24 +327,31 @@ classdef dbt
                    error('Unrecognized filter direction, %s.',me.direction)
            end
 
-           Frs = zeros([size(rsmat),ncol]);
+           Frs = zeros([size(rsmat),ncol],gpuarg{:});
            for  k = 1:ncol
                 f = F(:,k);
-               Frs(:,:,k) = double(f(rsmat));
-               if nsh>0
-                    Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
+               
+                if me.gpuEnable
+                
+                    Frs(:,:,k) = f(rsmat);
+               
+                   if nsh>0
+                        Frs(end+(1-nsh:0),1:nwin,k) = diag(tp)*Frs(end+(1-nsh:0),1:nwin,k);
 
-                   Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
-               end
+                       Frs(1:nsh,1:nwin,k) = diag(invtaper)*Frs(1:nsh,1:nwin,k); 
+                   end
 
-                %%% Set all negative frequencies to zero
-%                     Frs(rsmat(:, end-1:end)>ceil((newn+1)/2),end,k)=0;
-%                     Frs(rsmat(:, 1:2)>ceil((newn+1)/2),1,k)=0;
+                else
+                
+                    Frs(:,:,k) = f(rsmat);
 
-                %%% Corrections for DC and Nyquist to preserve power
-                %%% after zeroing negative frequencies
-%                 Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
-              %  Frs(dcindx + (k-1)*numel(rsmat))=Frs(dcindx + (k-1)*numel(rsmat))/sqrt(2); 
+                   if nsh>0
+%                         Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
+%                        Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
+                        Frs(end+(1-nsh:0),1:nwin,k) = diag(tp)*Frs(end+(1-nsh:0),1:nwin,k);
+                       Frs(1:nsh,1:nwin,k) = diag(invtaper)*Frs(1:nsh,1:nwin,k); 
+                   end
+                end
 
            end
 
@@ -394,19 +416,24 @@ classdef dbt
             
              upratio = me.upsampleFx+1;
            
+            if me.gpuEnable
+               gpuarg = {'gpuArray'};
+            else
+               gpuarg = {};
+           end
             if round(me.upsampleFx) ~= me.upsampleFx
                 error('\n%s does not currently allow signals to be reconstructed from a transform upsampled by a non-integer.',upper(mfilename))
             end
             if nargin < 2 || isempty(columnfilter)
-                mult = diag(sparse(ones(1,upratio)));
+                mult = diag(ones(1,upratio));
             elseif islogical(columnfilter)
-                mult = diag(sparse(columnfilter));
+                mult = diag(columnfilter);
             elseif min(size(columnfilter)) == 1 && min(columnfilter)>=1
                 
-               mult = diag(sparse( ismember(1:size(me.blrep,2),columnfilter)));
+               mult = diag( ismember(1:size(me.blrep,2),columnfilter));
                
             elseif min(size(columnfilter)) == 1
-                mult = diag(sparse(columnfilter));
+                mult = diag(columnfilter);
             else
                 mult = columnfilter;
             end
@@ -428,7 +455,7 @@ classdef dbt
 
            end
 
-            F = zeros(size(me.blrep,1),size(me.blrep,2)/upratio,ncol,upratio);
+            F = zeros(size(me.blrep,1),size(me.blrep,2)/upratio,ncol,upratio,gpuarg{:});
             for k = 1:ncol
                 for upsi = 1:upratio                 
                     F(:,:,k,upsi) = fft(me.blrep(:,upsi:upratio:end,k) )*mult(upsi:upratio:end,upsi:upratio:end)/sqrt(size(me.blrep,1)/2);         
@@ -470,8 +497,10 @@ classdef dbt
                
                 for k = 1:ncol
                     for upsi = 1:upratio
-                        sh = diag(sparse(invtaper))*F(1:nsh,2:end,k,upsi);                
-                        F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
+%                         sh = diag(sparse(invtaper))*F(1:nsh,2:end,k,upsi);                
+%                         F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
+                          sh = diag(invtaper)*F(1:nsh,2:end,k,upsi);                
+                        F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(tp)*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
                     end
                 end
                  
@@ -487,7 +516,7 @@ classdef dbt
 %             end
             
             F(1:nsh,:,:,:)=[];
-            Ffull = zeros(me.fullN,ncol);
+            Ffull = zeros(me.fullN,ncol,gpuarg{:});
             switch me.padding
                 case {'frequency','fft'}
                     warning('Frequency padding is an obsolete option.')
