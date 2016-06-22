@@ -342,9 +342,10 @@ classdef dbt
                     Frs(:,:,k) = f(rsmat);
                
                    if nsh>0
-                        Frs(end+(1-nsh:0),1:nwin,k) = diag(tp)*Frs(end+(1-nsh:0),1:nwin,k);
-
-                       Frs(1:nsh,1:nwin,k) = diag(invtaper)*Frs(1:nsh,1:nwin,k); 
+%                         Frs(end+(1-nsh:0),1:nwin,k) = diag(tp)*Frs(end+(1-nsh:0),1:nwin,k);
+%                        Frs(1:nsh,1:nwin,k) = diag(invtaper)*Frs(1:nsh,1:nwin,k); 
+                        Frs(end+(1-nsh:0),1:nwin,k) = repmat(tp(:),1,nwin).*Frs(end+(1-nsh:0),1:nwin,k);
+                       Frs(1:nsh,1:nwin,k) = repmat(invtaper(:),1,nwin).*Frs(1:nsh,1:nwin,k); 
                    end
 
                 else
@@ -354,8 +355,8 @@ classdef dbt
                    if nsh>0
 %                         Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
 %                        Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
-                        Frs(end+(1-nsh:0),1:nwin,k) = diag(tp)*Frs(end+(1-nsh:0),1:nwin,k);
-                       Frs(1:nsh,1:nwin,k) = diag(invtaper)*Frs(1:nsh,1:nwin,k); 
+                        Frs(end+(1-nsh:0),1:nwin,k) = repmat(tp(:),1,nwin).*Frs(end+(1-nsh:0),1:nwin,k);
+                       Frs(1:nsh,1:nwin,k) = repmat(invtaper(:),1,nwin).*Frs(1:nsh,1:nwin,k); 
                    end
                 end
 
@@ -505,8 +506,10 @@ classdef dbt
                     for upsi = 1:upratio
 %                         sh = diag(sparse(invtaper))*F(1:nsh,2:end,k,upsi);                
 %                         F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
-                          sh = diag(invtaper)*F(1:nsh,2:end,k,upsi);                
-                        F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(tp)*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
+%                           sh = diag(invtaper)*F(1:nsh,2:end,k,upsi);                
+                          sh = repmat(invtaper(:),1,size(F,2)-1).*F(1:nsh,2:end,k,upsi);                
+%                         F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(tp)*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
+                        F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = repmat(tp(:),1,size(F,2)-1).*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
                     end
                 end
                  
