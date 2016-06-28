@@ -227,11 +227,13 @@ for i = 1:length(dbx.frequency)
                   bly = squeeze(AY(t,i,event_type == unqev(k),:));
                  end
             else
-                  blx = reshape(AX(:,i,event_type == unqev(k),:),[size(AX,1)*size(AX,3), size(AX,4) 1]) ;
+                  ax = AX(:,i,event_type == unqev(k),:);
+                  blx = reshape(ax,[size(ax,1)*size(ax,3), size(ax,4) ]) ;
                  if isempty(y)
                     bly = blx;
                  else
-                    bly = reshape(AY(:,i,event_type == unqev(k),:),[size(AY,1)*size(AY,3), size(AY,4) 1]) ;
+                    ay = AY(:,i,event_type == unqev(k),:);
+                    bly = reshape(ay,[size(ay,1)*size(ay,3), size(ay,4) 1]) ;
 
                  end
             end
