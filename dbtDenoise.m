@@ -135,7 +135,7 @@ while i <= length(varargin)
                   flagthresh = varargin{i+1};
                   varargin(i:i+1) = [];
                   i = i-1;   
-                case {'makeplots'} 
+                case {'makeplots','plot','make plot'} 
                   makeplots = varargin{i+1};
                   varargin(i:i+1) = []; 
                   i = i-1;                

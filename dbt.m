@@ -104,7 +104,7 @@ classdef dbt
                           % frequencies, which halves the number of
                           % samples.
                           
-       gpuEnable = []; % Use GPU processor if available;
+       gpuEnable = true; % Use GPU processor if available;
          bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
@@ -119,11 +119,8 @@ classdef dbt
             
             me.taper = taper; %#ok<CPROP>
             
-            try % Use gpu by default when possible
-                me.gpuEnable = gpuDeviceCount>0;
-            catch
-                me.gpuEnable = false;
-            end
+           
+            using_gpu_default_setting = true;
             
             i = 4;       
             while i < length(varargin)
@@ -190,6 +187,7 @@ classdef dbt
                   case 'gpu'
                       me.gpuEnable = varargin{i+1};
                       i=i+1;
+                      using_gpu_default_setting = false;
                    otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
@@ -199,10 +197,15 @@ classdef dbt
            if isempty(varargin)
                return
            end
-           
-           if me.gpuEnable && gpuDeviceCount==0               
-               warning('No GPU device detected. Switching to non-GPU mode')
-               me.gpuEnable = false;
+           if using_gpu_default_setting && me.gpuEnable
+                try % Use gpu by default when possible
+                    me.gpuEnable = gpuDeviceCount>0;
+                catch
+                    me.gpuEnable = false;
+                end
+           elseif me.gpuEnable && gpuDeviceCount==0               
+                   warning('No GPU device detected. Switching to non-GPU mode')
+                   me.gpuEnable = false;
            end
            
            if me.gpuEnable
