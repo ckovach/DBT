@@ -208,17 +208,19 @@ classdef dbt
                    me.gpuEnable = false;
            end
            
-           if me.gpuEnable
-               gpuarg = {'gpuArray'};
-           else
-               gpuarg = {};
-           end
+        
            
            fs  = varargin{2};
            bw =  varargin{3};           
            fullsig  = varargin{1};
            me.inputargs = varargin(4:end);
-           
+
+          if me.gpuEnable
+               gpuarg = {'gpuArray'};
+           elseif ~isa(class(fullsig),'double')
+                gpuarg = {class(fullsig)};
+           end
+          
            n = size(fullsig,1);
            ncol = size(fullsig,2);
            
