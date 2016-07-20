@@ -181,6 +181,9 @@ if ~isempty(timerange)
    if ~isempty(y)
        [AY,tt] =  choptf(timerange,trigger,dby);
    end
+   if ~resolve_time
+      tt = 0; 
+   end
 else
     unqev =0;
     AX = dbx.blrep(keepT,:,:);
