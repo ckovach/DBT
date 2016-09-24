@@ -31,7 +31,8 @@ classdef dbt
 %   .centerDC: If false (default), the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
 %               otherwise each band is demodulated to be centered on DC.
-%   
+%   .cospower: Power applied to the window (default = 1). Frequency upsampling
+%             is adjusted by default to maintain a tight frame.
 %
 %  Options:
 %
@@ -103,7 +104,7 @@ classdef dbt
                           % that the signal contains negative
                           % frequencies, which halves the number of
                           % samples.
-                          
+         cospower=1;                 
        gpuEnable = true; % Use GPU processor if available;
          bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
@@ -188,7 +189,11 @@ classdef dbt
                       me.gpuEnable = varargin{i+1};
                       i=i+1;
                       using_gpu_default_setting = false;
-                   otherwise
+                    case 'cospower'
+                      me.cospower = varargin{i+1};
+                      i=i+1;
+                      using_gpu_default_setting = false;
+                  otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
               i = i+1;
@@ -209,6 +214,7 @@ classdef dbt
            end
            
         
+           me.upsampleFx = me.upsampleFx + me.cospower - 1;
            
            fs  = varargin{2};
            bw =  varargin{3};           
@@ -317,8 +323,8 @@ classdef dbt
            rsmat = mod(rsmat-1,newn)+1;
            %dcindx = find(rsmat==1);
 
-             tp = me.taper.make((0:1:nsh-1)/nsh); 
-            invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+             tp = me.taper.make((0:1:nsh-1)/nsh).^me.cospower; 
+            invtaper = me.taper.make(1-(0:1:nsh-1)/nsh).^me.cospower;
 
            switch me.direction
             %%% Approximate causal or anti-causal filters while
@@ -381,7 +387,7 @@ classdef dbt
                Frs = circshift(Frs,-ceil(winN/2*(1+me.shoulder)));  
            end
            
-            me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2)/sqrt(upratio);
+            me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2)/sqrt(upratio-me.cospower+1);
                
             me.sampling_rate = padN/newT;
                  
@@ -487,8 +493,8 @@ classdef dbt
              nnyq = size(F,1);
             if nsh >0
                 % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
-                tp = me.taper.make((0:1:nsh-1)/nsh); 
-                invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+                tp = me.taper.make((0:1:nsh-1)/nsh).^me.cospower; 
+                invtaper = me.taper.make(1-(0:1:nsh-1)/nsh).^me.cospower;
                 switch me.direction
                 %%% Approximate causal or anti-causal filters while
                 %%% preserving summation properties of the tapers.
@@ -548,7 +554,7 @@ classdef dbt
                     fillindx = 1+mod(fillindx(fillindx-fillindx(1)<me.fullN),me.fullN);
                      Ffull(  fillindx,k) =...
                         Ffull(  fillindx,k)...
-                        + f(true(size(fillindx))) * sqrt(me.fullN)/sqrt(upratio);
+                        + f(true(size(fillindx))) * sqrt(me.fullN*me.cospower)/sqrt(upratio-me.cospower+1);
                end
                if ~mod(me.fullN,2)
                   Ffull(ceil(me.fullN/2+1),k) = Ffull(ceil(me.fullN/2+1),k)/2;
