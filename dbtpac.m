@@ -47,6 +47,7 @@ cohargs = {};
 dbtargs = {};
 do_permtest = false;
 aPLV = false;
+ampargs = {};
 % if nargin <3 && isa(X,'dbt')
 %     fs = X.fullFS;
 % end
@@ -108,6 +109,9 @@ while i <= length(varargin)
         case {'cohargs'}
            cohargs = [cohargs,varargin{i+1}];
            i = i+1;
+        case {'ampargs'}
+           ampargs = [ampargs,varargin{i+1}];
+           i = i+1;
        otherwise
            error('Unrecognized keyword %s',varargin{i})
    end
@@ -116,7 +120,7 @@ end
 
 
     
-ampargs = {fs,ampbw,'padding','time','lowpass',min(amprange(2),fs/2),'offset',amprange(1),dbtargs{:}};
+ampargs = {fs,ampbw,'padding','time','lowpass',min(amprange(2),fs/2),'offset',amprange(1),dbtargs{:},ampargs{:}};
 dbamp = dbt(Y,ampargs{:}); %%% DBT from which band-limited amplitude will be obtained. 
 ampfs = dbamp.sampling_rate;
 
@@ -141,14 +145,15 @@ Xrs(end+1:length(dbamp.time),:,:) =0;
 Pperm =[];
 phargs = {phasebw,'padding','time','lowpass',min(phaserange(2),fs/2),'offset',phaserange(1),'keep time',keepT,phargs{:},dbtargs{:}}; %#ok<*CCAT>
 fprintf('\nBand: %4i',0)
+scalar_trans = @(x)log(x);
 for k = 1:length(dbamp.frequency)   
     fprintf('\b\b\b\b%4i',k)
     if get_trf
-        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});
+        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,scalar_trans(squeeze(abs(dbamp.blrep(:,k,:)))),ampfs,phargs{:},cohargs{:});
     elseif do_permtest
-         [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
+         [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,scalar_trans(squeeze(abs(dbamp.blrep(:,k,:)))),ampfs,phargs{:},cohargs{:});        
     else
-        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:)).^2),ampfs,phargs{:},cohargs{:});        
+        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,scalar_trans(squeeze(abs(dbamp.blrep(:,k,:)))),ampfs,phargs{:},cohargs{:});        
     end
     if get_csd
         csd(:,:,k,:,:,:) = c;
