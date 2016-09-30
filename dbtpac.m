@@ -109,6 +109,9 @@ while i <= length(varargin)
         case {'cohargs'}
            cohargs = [cohargs,varargin{i+1}];
            i = i+1;
+        case {'phargs'}
+           cohargs = [phargs,varargin{i+1}];
+           i = i+1;
         case {'ampargs'}
            ampargs = [ampargs,varargin{i+1}];
            i = i+1;
