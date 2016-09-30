@@ -47,8 +47,10 @@ mn = mean(abs(bx.blrep(use_time,:,:)),1);
 kp = mn~=0 & usepts;
 switch smoothing_method
     case 'polynomial'
-        p = polyfit(find(kp)./length(mn),log(mn(kp)),polyord);
-        bl = polyval(p,(1:length(mn))/length(mn));
+        for k = 1:size(mn,3)
+            p = polyfit(find(kp(:,:,k))./length(mn(:,:,k)),log(mn(:,kp(:,:,k),k)),polyord);
+            bl(:,:,k) = polyval(p,(1:length(mn(:,:,k)))/length(mn(:,:,k)));
+        end
     case 'moving_average'
         g = rectwin(smoothbw)';
         bl = log(convn(mn.*kp,g,'same')./convn(kp,g,'same'));
