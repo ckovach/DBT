@@ -603,6 +603,9 @@ classdef dbt
                 varargout(1:3) = {S,t,w};
             end
         end
+        function out = remodulator(me)
+                 out = exp(1i*2*pi*me.time*(me.frequency - (~me.centerDC)*me.bandwidth*(1+me.shoulder)/2));
+        end
     end
 end
     
