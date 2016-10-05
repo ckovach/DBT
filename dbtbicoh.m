@@ -1,4 +1,4 @@
-function [BICOH,w,bspect,NRM] = dbtbicoh(x,fs,bw,varargin)
+function [BICOH,w,bspect,NRM,dbx1] = dbtbicoh(x,fs,bw,varargin)
 
 % Computes bicoherence with DBT.
 %
@@ -19,21 +19,21 @@ warning('This script is under development and is not stable. Do not use it unles
 if nargin < 3
     bw = 1;    
 end
-upsampfx = 1;
-rotation = 'ww';
+upsampfx = 0;
+rotation = 'vv';
 
 type = 'fcov';
 switch lower(type)
     case 'fcov'
         %%
-        upsamptx = round(min(250,fs)/(2*bw));
+        upsamptx = round(min(300,fs)/(2*bw));
         %%% Compute DBT
-        dbx = dbt(x,fs,bw,'upsampleTx',upsamptx-1,'upsampleFx',upsampfx,'remodphase',true);
+        dbx1 = dbt(x,fs,bw,'upsampleTx',upsamptx-1,'upsampleFx',upsampfx,'remodphase',true);
        %%% Anti-aliasing filter and decimation
-        getfreq = dbx.sampling_rate/2;
-        nadj = sum(dbx.time<=(length(x)-1)./fs);
+        getfreq = dbx1.sampling_rate/2;
+        nadj = sum(dbx1.time<=(length(x)-1)./fs);
         %%% Get lowpass and hilbert filtered data
-        fxrs = fft(dbx.signal(dbx.frequency < getfreq,false));
+        fxrs = fft(dbx1.signal(dbx1.frequency < getfreq,false));
         
         %%% Resample to match dbt sampling rate as nearly as possible
         fxrs(nadj+1:end)=[];
@@ -44,8 +44,8 @@ switch lower(type)
         % xrs = x(round(decim/2):decim:end,:);
         
         %%% Weight with original signal 
-        blrep = dbx.blrep(1:length(xrs),dbx.frequency<getfreq);
-        w = dbx.frequency(dbx.frequency<getfreq);
+        blrep = dbx1.blrep(1:length(xrs),dbx1.frequency<getfreq);
+        w = dbx1.frequency(dbx1.frequency<getfreq);
         sz = size(blrep);
         sz(end+1:3)=1;
         blrep = reshape(blrep,[sz(1) sz(2)*sz(3)]);
@@ -103,11 +103,11 @@ switch lower(type)
         %% The standard approach
         
             
-                  dbx = dbt(x,fs,bw,'upsampleFx',upsampfx*0);
+                  dbx1 = dbt(x,fs,bw,'upsampleFx',upsampfx,'remodphase',false);
   
                  
-                 getfreq = 126;
-                 getf = dbx.frequency<=getfreq & dbx.frequency>=0;
+                 getfreq = 200;
+                 getf = dbx1.frequency<=getfreq & dbx1.frequency>=0;
                  switch rotation
                      case 'ww'
                          
@@ -121,10 +121,10 @@ switch lower(type)
 
                  end
                  %  inds = W3<=length(dbx.frequency);
-                 inds = W1>0 & W2 <=length(dbx.frequency)& W3<=length(dbx.frequency);
-                 w = dbx.frequency(getf);
-                 blrep = dbx.blrep(:,dbx.frequency>=0);
-                 cblrep = conj(dbx.blrep(:,dbx.frequency>=0));
+                 inds = W1>0 & W2 <=sum(getf)& W3<=length(dbx1.frequency);
+                 w = dbx1.frequency(getf);
+                 blrep = dbx1.blrep(:,dbx1.frequency>=0);
+                 cblrep = conj(dbx1.blrep(:,dbx1.frequency>=0));
                  bspect = nan(size(W1));
                  I1=W1;I2=W2;I3=W3;
                 % I1=V1;I2=V2;I3=V3;
