@@ -17,12 +17,17 @@ function [BICOH,w,bspect,NRM,dbx1] = dbtbicoh(x,fs,bw,varargin)
 warning('This script is under development and is not stable. Do not use it unless you know what you''re doing')
 
 if nargin < 3
-    bw = 1;    
+    bw = 1;      
 end
-upsampfx = 0;
-rotation = 'vv';
+%if nargin < 3
+    bw2x = 2;
+    bw2 = bw2x*bw;      
+%end
 
-type = 'fcov';
+upsampfx = 1;
+rotation = 'ww';
+
+type = 'nnb';
 switch lower(type)
     case 'fcov'
         %%
@@ -99,13 +104,21 @@ switch lower(type)
         end
 %        Wnrm = reshape(repmat(permute(abs(xrs),[1 3 2]),1,length(w)),[sz(1) sz(2)*sz(3)]).*abs(blrep);
      
-    case {'single','BBB','NNN'} 
+    case {'single','bbb','nnn','nnb'} 
         %% The standard approach
-        
+                
+                
             
-                  dbx1 = dbt(x,fs,bw,'upsampleFx',upsampfx,'remodphase',false);
-  
-                 
+                 if strcmpi(type,'nnb')
+                     upsamptx = bw2/bw;
+                      dbx2 = dbt(x,fs,bw2,'remodphase',false,'upsampleFx',(upsampfx+1)*upsamptx-1);
+                      dbx1 = dbt(x,fs,bw,'upsampleFx',upsampfx,'remodphase',false,'upsampleTx',upsamptx-1);
+                 else
+                     upsamptx = 1;
+                      dbx1 = dbt(x,fs,bw,'upsampleFx',upsampfx,'remodphase',false,'upsampleTx',upsamptx-1);
+                      dbx2 = dbx1;
+                 end
+                     
                  getfreq = 200;
                  getf = dbx1.frequency<=getfreq & dbx1.frequency>=0;
                  switch rotation
@@ -124,7 +137,7 @@ switch lower(type)
                  inds = W1>0 & W2 <=sum(getf)& W3<=length(dbx1.frequency);
                  w = dbx1.frequency(getf);
                  blrep = dbx1.blrep(:,dbx1.frequency>=0);
-                 cblrep = conj(dbx1.blrep(:,dbx1.frequency>=0));
+                 cblrep = conj(dbx2.blrep(:,dbx2.frequency>=0));
                  bspect = nan(size(W1));
                  I1=W1;I2=W2;I3=W3;
                 % I1=V1;I2=V2;I3=V3;
@@ -136,3 +149,8 @@ switch lower(type)
 end
    BICOH = bspect./NRM;
                      
+   
+   BICOH(isnan(BICOH))=0;
+   
+   
+   
