@@ -31,8 +31,10 @@ classdef dbt
 %   .centerDC: If false (default), the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
 %               otherwise each band is demodulated to be centered on DC.
-%   .cospower: Power applied to the window (default = 1). Frequency upsampling
-%             is adjusted by default to maintain a tight frame.
+%   .cospower: Power applied to the window (default = 1). Setting cospower=2
+%                gives a Hann window for the default window (with 
+%                shoulder = 1). Frequency upsampling is adjusted by default
+%                to maintain a tight frame.
 %
 %  Options:
 %
@@ -45,7 +47,7 @@ classdef dbt
 %      The overlapping portions of the bands are windowed with a  taper:
 %              ____   __________   ________   _________
 %                  \ /	        \ /        \ /   
-%     .  .  .	  X              X          X           . . . 
+%     .  .  .	    X            X          X           . . . 
 %                  / \	        / \        / \
 %                  |-----------|           |-|
 %                   BW              shoulder
@@ -100,13 +102,16 @@ classdef dbt
         upsampleFx = 0; %Amount by which to oversample the frequency dimension.
         userdata=[];
         centerDC = true; % If true, bands are demodulated to [-bandwidth bandwidth], otherwise to [0 bandwidth] with zero padding to 2*bandwidth.
-                          % If true, the pass band is centered at 0, so
-                          % that the signal contains negative
-                          % frequencies, which halves the number of
-                          % samples.
-         cospower=1;                 
-       gpuEnable = true; % Use GPU processor if available;
-         bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
+                          %  If true, the pass band is centered at 0, so
+                          %  that the signal contains negative
+                          %  frequencies, which halves the number of
+                          %  samples.
+                          
+        cospower=1;       % If greater than 1 applies a power-of-cosine window, cos(f)^cospower, in the frequency domain
+                          %   cospower=2 is the same as a Hann window. Default is the simple cosine window (cospower=1).  
+       
+        gpuEnable = true; % Use GPU processor if available;
+        bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
                             % correct average when averaging the raw spectrum over time.
