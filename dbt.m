@@ -306,7 +306,8 @@ classdef dbt
 %         foffset = me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize;
            % This adjusts the high-pass offset so it is an integer multiple of
            % frequency sampling
-           foffset = ceil((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
+%           foffset = ceil((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
+           foffset = round((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
            noffset = floor(foffset*newT );
            foffset=noffset/newT;
            me.offset = foffset + newbw*(1+me.shoulder)/2;
