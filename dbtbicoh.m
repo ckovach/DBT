@@ -215,7 +215,7 @@ if opts.do_svd
     tdcomp.time = dbx1.time;
     tdcomp.u = u;
     tdcomp.l = diag(l);
-    tdcomp.v = diag(v);
+    tdcomp.v = v;
 
 else
      A = nan;
