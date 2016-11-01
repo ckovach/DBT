@@ -1,4 +1,4 @@
-function [out,dbx,tdcomp] = dbtbicoh(x,fs,bw,varargin)
+function [out,dbx] = dbtbicoh(x,fs,bw,varargin)
 
 % Computes bicoherence with DBT.
 %
@@ -24,7 +24,10 @@ opts = struct(...
 'rotation','ww',...
 'maxfreq',Inf,...
 'type','bbb',...
-'do_svd',false);
+'do_decomp',false,...
+'decomp','svd',...
+'tdopts',{{}},...
+'tdrank',Inf);
 
 if nargin < 4 && isstruct(varargin{1})
     newopts = varargin{1};
@@ -58,14 +61,23 @@ while i < length(varargin)
       case {'bw2x'} % bw2 relative to bw when bandwidths differ
          opts.bw2x = varargin{i+1};
           i = i+1;
-      case {'bw2'} % bw2 relative to bw when bandwidths differ
+      case {'bw2'} 
          opts.bw2x = varargin{i+1}/opts.bw;
           i = i+1;
              
-        case {'svd'} % bw2 relative to bw when bandwidths differ
-         opts.do_svd = varargin{i+1};
+    case {'svd','cp_als','cp_fastals','tucker_als'} % tensor or svd decomposition
+         opts.do_decomp = varargin{i+1};
+         opts.decomp = varargin{i};
           i = i+1;
-           
+ 
+    case {'decomp'} % tensor decomposition specified
+         opts.decomp = varargin{i+1};
+         opts.do_decomp = ischar(opts.decomp) && ~isempty(opts.decomp) && ~strcmpi(opts.decomp,'none');
+          i = i+1;
+      case {'tdrank','npc','ncomp','pckeep'} % rank of decomposition (number of components to keep for svd)
+         opts.tdrank = varargin{i+1};
+          i = i+1;
+            
       otherwise
         error('Unrecognized keyword %s',varargin{i})  
   end
@@ -75,6 +87,33 @@ end
 bw2 = opts.bw2x*opts.bw;      
 lpf = min(fs/2,opts.maxfreq*2);
 nch = size(x,2);
+
+if nch > 1 && ~strcmpi(opts.decomp,'svd') && ~strcmpi(opts.decomp,'none');
+   q = which(opts.decomp);
+       
+   while isempty(q)
+        warning('Unable to find the decomposition method %s',opts.decomp)
+        switch opts.decomp
+            case {'cp_als','tucker_als'}
+                fprintf('\nThis method requires the tensor toolbox from here:\n')
+                fprintf('http://www.sandia.gov/~tgkolda/TensorToolbox/index-2.6.html\n')
+            case {'cp_fastals'}
+                fprintf('\nThis method requires the tensor toolbox from here:\n')
+                fprintf('\thttp://www.sandia.gov/~tgkolda/TensorToolbox/index-2.6.html\n')
+                fprintf('and also the extension here: \n')
+                fprintf('\thttp://www.bsp.brain.riken.jp/~phan/#tensorbox\n')               
+        end
+        fprintf('Do any necessary installation and add the folder to the path');
+        fn = uigetdir(sprintf('Find the directory containting %s.m',opts.decomp));
+        if isnumeric(fn)
+            fprintf('Aborting.')
+            return
+        end
+        addpath(fn)
+        q = which(opts.decomp);
+   end
+end
+
 switch lower(opts.type)
     case {'single','bbb','nnn','nnb','nbb','bnb'} 
         %% The standard approach
@@ -96,7 +135,7 @@ switch lower(opts.type)
                           dbx1 = dbt(x,fs,opts.bw,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx-1,'lowpass',lpf);
                           dbx2 = dbx1;
                  end
-                 tol = dbx1.fullFS./dbx1.fullN/2;
+                 %tol = dbx1.fullFS./dbx1.fullN/2;
 
          %        fstep1 = diff(dbx1.frequency(1:2));
                  fstep2 = diff(dbx2.frequency(1:2));
@@ -158,9 +197,9 @@ switch lower(opts.type)
 %                   if strcmpi(opts.type,'nbb') ||strcmpi(opts.type,'bbb') || strcmpi(opts.type,'nnn')
                   
                  if strcmpi(opts.type,'bnb')
-                      W1x = W2;
-                      W2 = W1;
-                      W1 = W1x;
+                      I1x = I2;
+                      I2 = I1;
+                      I1 = I1x;
                       blrep2 = blrep;
                     blrep = dbx2.blrep(keept2,getf2,:);
                     cblrep = conj(blrep);
@@ -198,26 +237,52 @@ out.opts =opts;
 out.BICOH(isnan(out.BICOH))=0;
 dbx = [dbx1,dbx2];
 
-if opts.do_svd 
-    [u,l,v] = svd(out.BICOH); 
-    getn = sum(diag(l)>0);
-    [uind,vind] = ndgrid(1:size(out.BICOH,1),1:size(out.BICOH,2));
-    U = u(uind(inds),1:getn);
-    V = v(vind(inds),1:getn);
+if opts.do_decomp %%% Apply tensor or svd decomposition to the inputs
+    if nch ==1 || strcmpi(opts.decomp,'svd') 
+        if nch >1
+            BICOH = reshape(out.BICOH,size(out.BICOH(:,:,1)).*[1 nch^2]);
+        else
+            BICOH = out.BICOH;
+        end
+        [u,l,v] = svd(BICOH); 
+        getn = min(sum(diag(l)>0),opts.tdrank);
+        [uind,vind] = ndgrid(1:size(BICOH,1),1:size(BICOH,2),1:nch,1:nch);
+        U = u(uind(inds),1:getn);
+        V = v(vind(inds),1:getn);
+    
 %     switch opts.type
 %         case 'nbb'
 
-            A =  (blrep(:,I1(inds),:).*blrep2(:,I2(inds),:).* cblrep(:,I3(inds),:))*(repmat(NRM(inds).^-1,1,getn).*(V.*conj(U))*diag(diag(l).^-.5));
+%            A =  (blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)))*(repmat(NRM(inds).^-1,1,getn).*(V.*conj(U))*diag(diag(l).^-.5));
 %         otherwise
 %             warning('SVD not yet implemented for case %s',opts.type)
 %             A = nan;
 %     end
-    tdcomp.Act = A;
-    tdcomp.time = dbx1.time;
-    tdcomp.u = u(:,1:getn);
-    tdcomp.l = diag(l);
-    tdcomp.v = v(:,1:getn);
-
+     %   tdcomp.Act = A;
+        tdcomp.time = dbx1.time;
+        tdcomp.u = u(:,1:getn);
+        tdcomp.l = diag(l);
+        if nch ==1
+            tdcomp.v = v(:,1:getn);
+        else
+           tdcomp.v = reshape(v(:,1:getn), [size(v,1)/nch^2  nch nch getn]);
+        end
+        UMAT= (V.*conj(U))*diag(diag(l(1:getn,1:getn)).^-.5);
+    else
+        %%% Apply tensor decomposition
+        getn = opts.tdrank;
+        decomp = str2func(opts.decomp); 
+        tdcomp = decomp(tensor(out.BICOH),opts.tdrank,opts.tdopts{:});
+        [u1ind,u2ind,ch1ind,ch2ind] = ndgrid(1:size(out.BICOH,1),1:size(out.BICOH,2),1:nch,1:nch);
+         UMAT = conj((tdcomp.U{1}(u1ind(inds),:).*tdcomp.U{2}(u2ind(inds),:).*tdcomp.U{3}(ch1ind(inds),:).*tdcomp.U{4}(ch2ind(inds),:))*diag(sqrt(tdcomp.lambda).^-1));
+        tdcomp = struct('tensor',tdcomp);
+    end
+      % Time activation
+       tdcomp.Act =  (blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)))*(repmat(NRM(inds).^-1,1,getn).*UMAT);
+        tdcomp.time = dbx1.time;
+ 
 else
      tdcomp = [];
 end
+out.tdcomp = tdcomp;
+
