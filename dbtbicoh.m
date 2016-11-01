@@ -25,7 +25,7 @@ upsampfx = 0;
 rotation = 'ww';
 maxfreq = Inf;
 type = 'bbb';
-
+do_svd = false;
   i = 1;   
   
 while i < length(varargin)
