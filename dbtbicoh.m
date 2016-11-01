@@ -17,6 +17,7 @@ function [out,dbx,tdcomp] = dbtbicoh(x,fs,bw,varargin)
 warning('This script is under development and is not stable. Do not use it unless you know what you''re doing')
 
 opts = struct(...
+'bw',bw,...
 'bw2x',4,...
 'symmetric',false,...
 'upsampfx',0,...
@@ -58,7 +59,7 @@ while i < length(varargin)
          opts.bw2x = varargin{i+1};
           i = i+1;
       case {'bw2'} % bw2 relative to bw when bandwidths differ
-         opts.bw2x = varargin{i+1}/bw;
+         opts.bw2x = varargin{i+1}/opts.bw;
           i = i+1;
              
         case {'svd'} % bw2 relative to bw when bandwidths differ
@@ -71,7 +72,7 @@ while i < length(varargin)
   i=i+1;
 end
 
-bw2 = opts.bw2x*bw;      
+bw2 = opts.bw2x*opts.bw;      
 lpf = min(fs/2,opts.maxfreq*2);
 nch = size(x,2);
 switch lower(opts.type)
@@ -82,17 +83,17 @@ switch lower(opts.type)
             
                  switch lower(opts.type)
                      case {'nnb','nbb','bnb'}
-                         upsamptx = bw2/bw-1;
+                         upsamptx = bw2/opts.bw-1;
                        %  upsamptx = 0;
                          upsampf2 = (opts.upsampfx+1)*(upsamptx+1)-1;
                           dbx2 = dbt(x,fs,bw2,'remodphase',false,'upsampleFx',upsampf2,'lowpass',lpf);
                      %     dbx2 = dbt(x,fs,bw2,'remodphase',false,'upsampleFx',opts.upsampfx);
-                          dbx1 = dbt(x,fs,bw,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx,'lowpass',lpf);
+                          dbx1 = dbt(x,fs,opts.bw,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx,'lowpass',lpf);
                     
                      otherwise
                          
                          upsamptx = 1;
-                          dbx1 = dbt(x,fs,bw,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx-1,'lowpass',lpf);
+                          dbx1 = dbt(x,fs,opts.bw,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx-1,'lowpass',lpf);
                           dbx2 = dbx1;
                  end
                  tol = dbx1.fullFS./dbx1.fullN/2;
@@ -193,7 +194,7 @@ out.bspect = bspect;
 out.NRM = NRM;
 out.w1 = w1;
 out.w2 = w2;
-
+out.opts =opts;
 out.BICOH(isnan(out.BICOH))=0;
 dbx = [dbx1,dbx2];
 
@@ -203,20 +204,20 @@ if opts.do_svd
     [uind,vind] = ndgrid(1:size(out.BICOH,1),1:size(out.BICOH,2));
     U = u(uind(inds),1:getn);
     V = v(vind(inds),1:getn);
-    switch opts.type
-        case 'nbb'
+%     switch opts.type
+%         case 'nbb'
 
             A =  (blrep(:,I1(inds),:).*blrep2(:,I2(inds),:).* cblrep(:,I3(inds),:))*(repmat(NRM(inds).^-1,1,getn).*(V.*conj(U))*diag(diag(l).^-.5));
-        otherwise
-            warning('SVD not yet implemented for case %s',opts.type)
-            A = nan;
-    end
+%         otherwise
+%             warning('SVD not yet implemented for case %s',opts.type)
+%             A = nan;
+%     end
     tdcomp.Act = A;
     tdcomp.time = dbx1.time;
-    tdcomp.u = u;
+    tdcomp.u = u(:,1:getn);
     tdcomp.l = diag(l);
-    tdcomp.v = v;
+    tdcomp.v = v(:,1:getn);
 
 else
-     A = nan;
+     tdcomp = [];
 end
