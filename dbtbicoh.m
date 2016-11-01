@@ -1,4 +1,4 @@
-function [BICOH,bspect,w,w2,NRM,dbx1,dbx2,A] = dbtbicoh(x,fs,bw,varargin)
+function [BICOH,bspect,w1,w2,NRM,dbx1,dbx2,A] = dbtbicoh(x,fs,bw,varargin)
 
 % Computes bicoherence with DBT.
 %
@@ -137,7 +137,7 @@ switch lower(type)
                  end
                  blrep = dbx1.blrep(keept1,getf,:);
 %                  bspect = nan([size(W1,1) size(W1,2) nch^2]);
-                 bspect = nan(size(W));
+                 bspect = nan(size(W1));
                  
                  Ich1 =( WCh1 - 1)*sum(getf);
                  Ich2 =( WCh2 - 1)*sum(getf2);
@@ -195,7 +195,7 @@ end
         case 'nbb'
                 
             A =  (blrep(:,I1(inds),:).*blrep2(:,I2(inds),:).* cblrep(:,I3(inds),:))*(repmat(NRM(inds).^-1,1,getn).*(V.*conj(U))*diag(diag(l).^-.5));
-            otherwisefig
+        otherwise
             warning('SVD not yet implemented for case %s',type)
             A = nan;
  end
