@@ -1,4 +1,4 @@
-function [BICOH,bspect,w,w2,NRM,dbx1,dbx2] = dbtbicoh(x,fs,bw,varargin)
+function [BICOH,bspect,w,w2,NRM,dbx1,dbx2,A] = dbtbicoh(x,fs,bw,varargin)
 
 % Computes bicoherence with DBT.
 %
@@ -25,6 +25,7 @@ upsampfx = 1;
 rotation = 'ww';
 
 type = 'bbb';
+do_svd = false;
 
   i = 1;   
   
@@ -43,7 +44,10 @@ while i < length(varargin)
       case {'bw2x'} % bw2 relative to bw when bandwidths differ
          bw2x = varargin{i+1};
           i = i+1;
-             
+        case {'svd'} % bw2 relative to bw when bandwidths differ
+         do_svd = varargin{i+1};
+          i = i+1;
+           
       otherwise
         error('Unrecognized keyword %s',varargin{i})  
   end
@@ -229,5 +233,20 @@ end
    
    BICOH(isnan(BICOH))=0;
    
-   
-   
+ if do_svd 
+    [u,l,v] = svd(BICOH); 
+    getn = sum(diag(l)>0);
+    [uind,vind] = ndgrid(1:size(BICOH,1),1:size(BICOH,2));
+    U = u(uind(inds),1:getn);
+    V = v(vind(inds),1:getn);
+    switch type
+        case 'nbb'
+                
+            A =  (blrep(:,I1(inds),:).*blrep2(:,I2(inds),:).* cblrep(:,I3(inds),:))*(repmat(NRM(inds).^-1,1,getn).*(V.*conj(U))*diag(diag(l).^-.5));
+            otherwisefig
+            warning('SVD not yet implemented for case %s',type)
+            A = nan;
+ end
+ else
+     A = nan;
+ end
