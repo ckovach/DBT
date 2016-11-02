@@ -31,7 +31,7 @@ opts = struct(...
 'w1lim',Inf,...
 'w2lim',Inf);
 
-if nargin < 4 && isstruct(varargin{1})
+if nargin > 3 && isstruct(varargin{1})
     newopts = varargin{1};
     fn = fieldnames(newopts);
     for k = 1:lengt(fn)
