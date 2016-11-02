@@ -27,7 +27,9 @@ opts = struct(...
 'do_decomp',false,...
 'decomp','svd',...
 'tdopts',{{}},...
-'tdrank',Inf);
+'tdrank',Inf,...
+'w1lim',Inf,...
+'w2lim',Inf);
 
 if nargin < 4 && isstruct(varargin{1})
     newopts = varargin{1};
@@ -51,6 +53,12 @@ while i < length(varargin)
           i = i+1;
       case {'symmetric'}
           opts.symmetric = varargin{i+1};
+          i = i+1;
+      case {'w1lim'} % Upper limit on frequency 1
+          opts.w1lim= varargin{i+1};
+          i = i+1;
+      case {'w2lim'}
+          opts.w2lim= varargin{i+1};
           i = i+1;
       case {'maxfreq'}
           opts.maxfreq = varargin{i+1};
@@ -145,8 +153,14 @@ switch lower(opts.type)
                  keept1(sum(keept2)+1:end)=[];
                  getfreq = min(opts.maxfreq,dbx1.fullFS/2);
                 
-                 getf = dbx1.frequency<=getfreq & dbx1.frequency>=-1e-9; %& abs(mod(dbx1.frequency,fstep2))<tol;
-                 getf2 = dbx2.frequency<=getfreq & dbx2.frequency>=-1e-9;
+                 % Frequencies defining the region of the bispectrum to
+                 % compute
+                 getf = dbx1.frequency<=getfreq & dbx1.frequency>=-1e-9 & dbx1.frequency<=opts.w1lim*2; %& abs(mod(dbx1.frequency,fstep2))<tol;
+                 getf2 = dbx2.frequency<=getfreq & dbx2.frequency>=-1e-9 & dbx2.frequency<=opts.w2lim;
+                 % Frequency bands needed in computing the bispecturm 
+                 keepf1=dbx1.frequency>=-1e-9;
+                 keepf2=dbx2.frequency>=-1e-9;
+                  
                  w1 = dbx1.frequency(getf);
                  w2 = dbx2.frequency(getf2);
                  if ~opts.symmetric
@@ -179,16 +193,16 @@ switch lower(opts.type)
                  end
              
                  %  inds = W3<=length(dbx.frequency);
-                 inds = W1>0 & W2 <=sum(getf2)& W3<=sum(getf2);
+                 inds = W1>0 & W2 <=sum(getf2)& W3*fstep3<=opts.maxfreq;
                  if ~opts.symmetric
                     inds = inds & W1 <=W2; 
                  end
-                 blrep = dbx1.blrep(keept1,getf,:);
+                 blrep = dbx1.blrep(keept1,keepf1,:);
 %                  bspect = nan([size(W1,1) size(W1,2) nch^2]);
                  bspect = nan(size(W1));
                  
-                 Ich1 =( WCh1 - 1)*sum(getf);
-                 Ich2 =( WCh2 - 1)*sum(getf2);
+                 Ich1 =( WCh1 - 1)*sum(keepf1);
+                 Ich2 =( WCh2 - 1)*sum(keepf2);
                  I1=W1 + Ich1;
                  I2=W2 + Ich2;
                  I3=W3 + Ich2;
@@ -201,10 +215,10 @@ switch lower(opts.type)
                       I2 = I1;
                       I1 = I1x;
                       blrep2 = blrep;
-                    blrep = dbx2.blrep(keept2,getf2,:);
+                    blrep = dbx2.blrep(keept2,keepf1,:);
                     cblrep = conj(blrep);
                 else
-                      blrep2 = dbx2.blrep(keept2,getf2,:);
+                      blrep2 = dbx2.blrep(keept2,keepf2,:);
                     cblrep = conj(blrep2);
                 
                  end
