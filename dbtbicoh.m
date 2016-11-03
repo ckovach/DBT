@@ -29,12 +29,13 @@ opts = struct(...
 'tdopts',{{}},...
 'tdrank',Inf,...
 'w1lim',Inf,...
-'w2lim',Inf);
+'w2lim',Inf,...
+'loopchan',true);
 
 if nargin > 3 && isstruct(varargin{1})
     newopts = varargin{1};
     fn = fieldnames(newopts);
-    for k = 1:lengt(fn)
+    for k = 1:length(fn)
         opts.(fn{k}) = newopts.(fn{k});
     end
     varargin(1) = [];
@@ -85,6 +86,9 @@ while i < length(varargin)
       case {'tdrank','npc','ncomp','pckeep'} % rank of decomposition (number of components to keep for svd)
          opts.tdrank = varargin{i+1};
           i = i+1;
+      case {'loopchan'} % copmute cross-bicoherece in loop rather than vectorized (for the sake of memory)
+         opts.loopchan = varargin{i+1};
+          i = i+1;
             
       otherwise
         error('Unrecognized keyword %s',varargin{i})  
@@ -95,6 +99,14 @@ end
 bw2 = opts.bw2x*opts.bw;      
 lpf = min(fs/2,opts.maxfreq*2);
 nch = size(x,2);
+if opts.loopchan
+    
+    nloop = nch;
+    nch2 = 1;
+else
+    nloop = 1;
+    nch2 = nch;
+end
 
 if nch > 1 && ~strcmpi(opts.decomp,'svd') && ~strcmpi(opts.decomp,'none');
    q = which(opts.decomp);
@@ -175,7 +187,7 @@ switch lower(opts.type)
                          
                          %[W1,W2] = ndgrid(1:sum(getf),1:sum(getf2));   
                          if nch > 1
-                            [W1,W2,WCh1,WCh2] = ndgrid(w1keep,1:opts.bw2x:sum(getf2),1:nch,1:nch);      
+                            [W1,W2,WCh1,WCh2] = ndgrid(w1keep,1:opts.bw2x:sum(getf2),1:nch,1:nch2);      
                          else
                              [W1,W2] = ndgrid(w1keep,1:opts.bw2x:sum(getf2));
                              WCh1 = 1;
@@ -184,11 +196,11 @@ switch lower(opts.type)
                          W3 = round((w1(W1)+w2(W2)-w2(1))./fstep3)+1;
                          
                          w2 = w2(1:opts.bw2x:sum(getf2));
-                     case 'vv'
-                         [V1,V2] = ndgrid(1:sum(getf),1:sum(getf2));        
-                        W1=(V1-V2)+1;
-                        W2=(V1+V2)-1;
-                        W3 = 2*V1-1;
+%                      case 'vv'
+%                          [V1,V2] = ndgrid(1:sum(getf),1:sum(getf2));        
+%                         W1=(V1-V2)+1;
+%                         W2=(V1+V2)-1;
+%                         W3 = 2*V1-1;
 
                  end
              
@@ -197,7 +209,10 @@ switch lower(opts.type)
                  if ~opts.symmetric
                     inds = inds & W1 <=W2; 
                  end
-                 blrep = dbx1.blrep(keept1,keepf1,:);
+                blrep = dbx1.blrep(keept1,keepf1,:);
+                if nch >1
+                         blrep = reshape(blrep,size(blrep,1),size(blrep,2)*nch);
+                end 
 %                  bspect = nan([size(W1,1) size(W1,2) nch^2]);
                  bspect = nan(size(W1));
                  
@@ -206,42 +221,54 @@ switch lower(opts.type)
                  I1=W1 + Ich1;
                  I2=W2 + Ich2;
                  I3=W3 + Ich2;
+                     if strcmpi(opts.type,'bnb')
+                          I1x = I2;
+                          I2 = I1;
+                          I1 = I1x;
+                          blrep2 = blrep;
+                     end
                       
                 % I1=V1;I2=V2;I3=V3;
 %                   if strcmpi(opts.type,'nbb') ||strcmpi(opts.type,'bbb') || strcmpi(opts.type,'nnn')
-                  
-                 if strcmpi(opts.type,'bnb')
-                      I1x = I2;
-                      I2 = I1;
-                      I1 = I1x;
-                      blrep2 = blrep;
-                    blrep = dbx2.blrep(keept2,keepf1,:);
-                    cblrep = conj(blrep);
-                else
-                      blrep2 = dbx2.blrep(keept2,keepf2,:);
-                    cblrep = conj(blrep2);
-                
-                 end
-                 if nch >1
-                     blrep = reshape(blrep,size(blrep,1),size(blrep,2)*nch);
-                     blrep2 = reshape(blrep2,size(blrep2,1),size(blrep2,2)*nch);
-                     cblrep = reshape(cblrep,size(cblrep,1),size(cblrep,2)*nch);
-                 end
-%                   elseif  strcmpi(opts.type,'bnb')
-%                           cblrep = conj(blrep);
-%                           blrep2 = dbx2.blrep(keept2,getf2,:);
-%                   elseif  strcmpi(opts.type,'bbb') || strcmpi(opts.type,'nnn')
-%                           cblrep = conj(blrep);
-%                           blrep2 = blrep;
-%                   end
+                 for chi = 1:nloop 
+                     if strcmpi(opts.type,'bnb')
+                        blrep = dbx2.blrep(keept2,keepf1,chi+(1:nch2)-1);
+                        cblrep = conj(blrep);
+                    else
+                          blrep2 = dbx2.blrep(keept2,keepf2,chi+(1:nch2)-1);
+                        cblrep = conj(blrep2);
 
-                 bspect(inds) = sum(blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)));
+                     end
+                     if nch >1
+%                          blrep = reshape(blrep,size(blrep,1),size(blrep,2)*nch);
+                         blrep2 = reshape(blrep2,size(blrep2,1),size(blrep2,2)*nch2);
+                         cblrep = reshape(cblrep,size(cblrep,1),size(cblrep,2)*nch2);
+                     end
+    %                   elseif  strcmpi(opts.type,'bnb')
+    %                           cblrep = conj(blrep);
+    %                           blrep2 = dbx2.blrep(keept2,getf2,:);
+    %                   elseif  strcmpi(opts.type,'bbb') || strcmpi(opts.type,'nnn')
+    %                           cblrep = conj(blrep);
+    %                           blrep2 = blrep;
+    %                   end
+
+                     bspect(inds) = sum(blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)));
                     
-                 NRM = nan(size(bspect));
-                 NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds))).^2).* sum(abs(cblrep(:,I3(inds))).^2));
+                     NRM = nan(size(bspect));
+                     NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds))).^2).* sum(abs(cblrep(:,I3(inds))).^2));
+                     if opts.loopchan
+                         bspects(:,:,:,chi) = bspect;
+                         NRMs(:,:,:,chi) = NRM;
+                     end
+                 end
 %                 NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds),:)).^2).* sum(abs(cblrep(:,I3(inds),:).*blrep2(:,I2(inds),:)).^2));
              
 end
+if opts.loopchan
+    bspect = bspects;
+    NRM = NRMs;
+end
+
 out.BICOH = bspect./NRM;
 out.bspect = bspect;
 out.NRM = NRM;
@@ -252,51 +279,64 @@ out.BICOH(isnan(out.BICOH))=0;
 dbx = [dbx1,dbx2];
 
 if opts.do_decomp %%% Apply tensor or svd decomposition to the inputs
-    if nch ==1 || strcmpi(opts.decomp,'svd') 
-        if nch >1
-            BICOH = reshape(out.BICOH,size(out.BICOH(:,:,1)).*[1 nch^2]);
+   td.Act = 0; 
+  for chi = 1:nloop 
+         if strcmpi(opts.type,'bnb')
+            blrep = dbx2.blrep(keept2,keepf1,chi+(1:nch2)-1);
+            cblrep = conj(blrep);
         else
-            BICOH = out.BICOH;
-        end
-        [u,l,v] = svd(BICOH); 
-        getn = min(sum(diag(l)>0),opts.tdrank);
-        [uind,vind] = ndgrid(1:size(BICOH,1),1:size(BICOH,2),1:nch,1:nch);
-        U = u(uind(inds),1:getn);
-        V = v(vind(inds),1:getn);
-    
-%     switch opts.type
-%         case 'nbb'
+              blrep2 = dbx2.blrep(keept2,keepf2,chi+(1:nch2)-1);
+            cblrep = conj(blrep2);
 
-%            A =  (blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)))*(repmat(NRM(inds).^-1,1,getn).*(V.*conj(U))*diag(diag(l).^-.5));
-%         otherwise
-%             warning('SVD not yet implemented for case %s',opts.type)
-%             A = nan;
-%     end
-     %   tdcomp.Act = A;
-        tdcomp.time = dbx1.time;
-        tdcomp.u = u(:,1:getn);
-        tdcomp.l = diag(l);
-        if nch ==1
-            tdcomp.v = v(:,1:getn);
+         end
+
+        if nch ==1 || strcmpi(opts.decomp,'svd') 
+            if nch >1
+                BICOH = reshape(out.BICOH,size(out.BICOH(:,:,1)).*[1 nch^2]);
+            else
+                BICOH = out.BICOH;
+            end
+            [u,l,v] = svd(BICOH); 
+            getn = min(sum(diag(l)>0),opts.tdrank);
+            [uind,vind] = ndgrid(1:size(BICOH,1),1:size(BICOH,2),1:nch,1:nch);
+            U = u(uind(inds),1:getn);
+            V = v(vind(inds),1:getn);
+
+    %     switch opts.type
+    %         case 'nbb'
+
+    %            A =  (blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)))*(repmat(NRM(inds).^-1,1,getn).*(V.*conj(U))*diag(diag(l).^-.5));
+    %         otherwise
+    %             warning('SVD not yet implemented for case %s',opts.type)
+    %             A = nan;
+    %     end
+         %   tdcomp.Act = A;
+            tdcomp.time = dbx1.time;
+            tdcomp.u = u(:,1:getn);
+            tdcomp.l = diag(l);
+            if nch ==1
+                tdcomp.v = v(:,1:getn);
+            else
+               tdcomp.v = reshape(v(:,1:getn), [size(v,1)/nch^2  nch nch2 getn]);
+            end
+            UMAT= (V.*conj(U))*diag(diag(l(1:getn,1:getn)).^-.5);
         else
-           tdcomp.v = reshape(v(:,1:getn), [size(v,1)/nch^2  nch nch getn]);
+            %%% Apply tensor decomposition
+            getn = opts.tdrank;
+            decomp = str2func(opts.decomp); 
+            tdcomp = decomp(tensor(out.BICOH),opts.tdrank,opts.tdopts{:});
+            [u1ind,u2ind,ch1ind,ch2ind] = ndgrid(1:size(out.BICOH,1),1:size(out.BICOH,2),1:nch,chi+(1:nch2)-1);
+             UMAT = conj((tdcomp.U{1}(u1ind(inds),:).*tdcomp.U{2}(u2ind(inds),:).*tdcomp.U{3}(ch1ind(inds),:).*tdcomp.U{4}(ch2ind(inds),:))*diag(sqrt(tdcomp.lambda).^-1));
+            tdcomp = struct('tensor',tdcomp);
         end
-        UMAT= (V.*conj(U))*diag(diag(l(1:getn,1:getn)).^-.5);
-    else
-        %%% Apply tensor decomposition
-        getn = opts.tdrank;
-        decomp = str2func(opts.decomp); 
-        tdcomp = decomp(tensor(out.BICOH),opts.tdrank,opts.tdopts{:});
-        [u1ind,u2ind,ch1ind,ch2ind] = ndgrid(1:size(out.BICOH,1),1:size(out.BICOH,2),1:nch,1:nch);
-         UMAT = conj((tdcomp.U{1}(u1ind(inds),:).*tdcomp.U{2}(u2ind(inds),:).*tdcomp.U{3}(ch1ind(inds),:).*tdcomp.U{4}(ch2ind(inds),:))*diag(sqrt(tdcomp.lambda).^-1));
-        tdcomp = struct('tensor',tdcomp);
-    end
-      % Time activation
-       tdcomp.Act =  (blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)))*(repmat(NRM(inds).^-1,1,getn).*UMAT);
-        tdcomp.time = dbx1.time;
- 
+          % Time activation
+           tdcomp.Act = td.Act + (blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)))*(repmat(NRM(inds).^-1,1,getn).*UMAT);
+            tdcomp.time = dbx1.time;
+
+  end
 else
-     tdcomp = [];
+         tdcomp = [];
 end
+
 out.tdcomp = tdcomp;
 
