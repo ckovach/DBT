@@ -30,7 +30,8 @@ opts = struct(...
 'tdrank',Inf,...
 'w1lim',Inf,...
 'w2lim',Inf,...
-'loopchan',true);
+'loopchan',true,...
+'normalization','bicoh');
 
 if nargin > 3 && isstruct(varargin{1})
     newopts = varargin{1};
@@ -88,6 +89,9 @@ while i < length(varargin)
           i = i+1;
       case {'loopchan'} % copmute cross-bicoherece in loop rather than vectorized (for the sake of memory)
          opts.loopchan = varargin{i+1};
+          i = i+1;
+        case {'normalization'} % copmute cross-bicoherece in loop rather than vectorized (for the sake of memory)
+         opts.normalization = varargin{i+1};
           i = i+1;
             
       otherwise
@@ -205,7 +209,7 @@ switch lower(opts.type)
                  end
              
                  %  inds = W3<=length(dbx.frequency);
-                 inds = W1>0 & W2 <=sum(getf2)& W3*fstep3<=opts.maxfreq;
+                 inds = W1>0 & W2 <=sum(getf2)& W3<=max(find(keepf2));
                  if ~opts.symmetric
                     inds = inds & W1 <=W2; 
                  end
@@ -255,10 +259,25 @@ switch lower(opts.type)
                      bspect(inds) = sum(blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)));
                     
                      NRM = nan(size(bspect));
-                     NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds))).^2).* sum(abs(cblrep(:,I3(inds))).^2));
+                     bias =nan;
+                     switch opts.normalization
+                         case 'bicoh'
+                             NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds))).^2).* sum(abs(cblrep(:,I3(inds))).^2));
+                         case 'awplv'
+                             NRM(inds) = sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds))));
+                         case 'awplvbc'
+                             NRM(inds) = sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds))));
+                             bias = zeros(size(NRM));
+                             bias(inds) = sqrt(sum((abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds)))).^2))./sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds))));
+                         otherwise
+                             error('Unrecognized normalization, %s',opts.normalization)
+                     end
                      if opts.loopchan
                          bspects(:,:,:,chi) = bspect;
                          NRMs(:,:,:,chi) = NRM;
+                         if ~isscalar(bias) || isnan(bias)
+                             biases(:,:,:,chi) = bias;
+                         end
                      end
                  end
 %                 NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds),:)).^2).* sum(abs(cblrep(:,I3(inds),:).*blrep2(:,I2(inds),:)).^2));
@@ -267,11 +286,13 @@ end
 if opts.loopchan
     bspect = bspects;
     NRM = NRMs;
+    bias = biases;
 end
 
 out.BICOH = bspect./NRM;
 out.bspect = bspect;
 out.NRM = NRM;
+out.bias = bias;
 out.w1 = w1;
 out.w2 = w2;
 out.opts =opts;
