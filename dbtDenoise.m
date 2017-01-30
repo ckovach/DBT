@@ -14,7 +14,7 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %
 %    Inputs:
 % 
-%       x - signal
+%       x - signal as a column vector.
 %       Fs - sampling frequency
 %       bandwidth to use in the dbt (default = 0.05)
 %
@@ -72,6 +72,7 @@ spike.threshold = 10; % This is the threshold used in detecting spikes.
                       % kurtosis-threshold.
 spike.smoothwindow = .2;% Apply hanning window of given duration to smooth the spike filter.
 spike.interpolate = false;% 
+spike.combine_channels = false;% 
 filter_above = 40; 
 use_stft = false;
 zhithresh = 6;
