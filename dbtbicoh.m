@@ -1,5 +1,8 @@
-function [out,dbx] = dbtbicoh(x,fs,bw,varargin)
+function [out,dbx] = dbtbicoh(x1,x2,varargin)
 
+%
+% [out,dbx] = dbtbicoh(x1,x2,fs,bw,varargin)
+%
 % Computes bicoherence with DBT.
 %
 % This script is under development and is not stable. Do not use it unless
@@ -16,8 +19,37 @@ function [out,dbx] = dbtbicoh(x,fs,bw,varargin)
 
 warning('This script is under development and is not stable. Do not use it unless you know what you''re doing')
 
+
+dbx1 = [];
+dbx2 = [];
+if isa(x1,'dbt')
+    if isscalar(x1)
+        dbx1 = x1;        
+    else
+        dbx1=x1(1);
+        dbx2 =x1(2);
+    end
+end
+    
+if isscalar(x2)
+    if isa(x2,'dbt')
+        dbx2 = x2;
+    elseif isnumeric(x2)
+        fs = x2;
+        bw=varargin{1};
+        varargin(1)=[];
+        x2 = x1;
+    end
+elseif isnumeric(x2)
+    fs = varargin{1};
+    bw = varargin{2};
+    varargin(1:2)=[];
+end
+    
+
+
 opts = struct(...
-'bw',bw,...
+'bw1',bw,...
 'bw2x',4,...
 'symmetric',false,...
 'upsampfx',0,...
@@ -41,7 +73,7 @@ if nargin > 3 && isstruct(varargin{1})
     end
     varargin(1) = [];
 end
-    
+
 
 i = 1;     
 while i < length(varargin)
@@ -70,9 +102,15 @@ while i < length(varargin)
           i = i+1;
       case {'bw2x'} % bw2 relative to bw when bandwidths differ
          opts.bw2x = varargin{i+1};
+         opts.bw2=opts.bw1*opts.bw2x;
           i = i+1;
       case {'bw2'} 
-         opts.bw2x = varargin{i+1}/opts.bw;
+          opts.bw2=varargin{i+1};
+         opts.bw2x = opts.bw2/opts.bw1;
+          i = i+1;
+      case {'bw1'} 
+         opts.bw1 = varargin{i+1};
+         opts.bw2x=opts.bw2/opts.bw1;
           i = i+1;
              
     case {'svd','cp_als','cp_fastals','tucker_als'} % tensor or svd decomposition
@@ -100,19 +138,20 @@ while i < length(varargin)
   i=i+1;
 end
 
-bw2 = opts.bw2x*opts.bw;      
+opts.bw2 = opts.bw2x*opts.bw1;      
 lpf = min(fs/2,opts.maxfreq*2);
-nch = size(x,2);
+nch1 = size(x1,2);
+nch2 = size(x2,2);
 if opts.loopchan
     
-    nloop = nch;
+    nloop = nch2;
     nch2 = 1;
 else
     nloop = 1;
-    nch2 = nch;
+%     nch2 = nch;
 end
 
-if nch > 1 && ~strcmpi(opts.decomp,'svd') && ~strcmpi(opts.decomp,'none');
+if max(nch1,nch2) > 1 && ~strcmpi(opts.decomp,'svd') && ~strcmpi(opts.decomp,'none');
    q = which(opts.decomp);
        
    while isempty(q)
@@ -139,25 +178,33 @@ if nch > 1 && ~strcmpi(opts.decomp,'svd') && ~strcmpi(opts.decomp,'none');
 end
 
 switch lower(opts.type)
-    case {'single','bbb','nnn','nnb','nbb','bnb'} 
+    case {'single','bbb','nnn','nnb','nbb','bnb','mi'} 
         %% The standard approach
                 
                 
             
                  switch lower(opts.type)
-                     case {'nnb','nbb','bnb'}
-                         upsamptx = bw2/opts.bw-1;
+                     case {'nnb','nbb','bnb','mi'}
+                         upsamptx = opts.bw2/opts.bw1-1;
                        %  upsamptx = 0;
                          upsampf2 = (opts.upsampfx+1)*(upsamptx+1)-1;
-                          dbx2 = dbt(x,fs,bw2,'remodphase',false,'upsampleFx',upsampf2,'lowpass',lpf);
+                         
+                         if isscalar(x2)
+                             x2 = x1;
+                         end
+                          dbx2 = dbt(x2,fs,opts.bw2,'remodphase',false,'upsampleFx',upsampf2,'lowpass',lpf,'gpu',false);
                      %     dbx2 = dbt(x,fs,bw2,'remodphase',false,'upsampleFx',opts.upsampfx);
-                          dbx1 = dbt(x,fs,opts.bw,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx,'lowpass',lpf);
+                          dbx1 = dbt(x1,fs,opts.bw1,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx,'lowpass',lpf,'gpu',false);
                     
                      otherwise
                          
                          upsamptx = 1;
-                          dbx1 = dbt(x,fs,opts.bw,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx-1,'lowpass',lpf);
-                          dbx2 = dbx1;
+                          dbx1 = dbt(x1,fs,opts.bw1,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx-1,'lowpass',lpf,'gpu',false);
+                         if isscalar(x2)
+                            dbx2 = dbx1;
+                         else
+                            dbx2 = dbt(x2,fs,opts.bw2,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx-1,'lowpass',lpf,'gpu',false);
+                         end
                  end
                  %tol = dbx1.fullFS./dbx1.fullN/2;
 
@@ -190,8 +237,8 @@ switch lower(opts.type)
                      case 'ww'
                          
                          %[W1,W2] = ndgrid(1:sum(getf),1:sum(getf2));   
-                         if nch > 1
-                            [W1,W2,WCh1,WCh2] = ndgrid(w1keep,1:opts.bw2x:sum(getf2),1:nch,1:nch2);      
+                         if max(nch1,nch2) > 1
+                            [W1,W2,WCh1,WCh2] = ndgrid(w1keep,1:opts.bw2x:sum(getf2),1:nch1,1:nch2);      
                          else
                              [W1,W2] = ndgrid(w1keep,1:opts.bw2x:sum(getf2));
                              WCh1 = 1;
@@ -214,8 +261,8 @@ switch lower(opts.type)
                     inds = inds & W1 <=W2; 
                  end
                 blrep = dbx1.blrep(keept1,keepf1,:);
-                if nch >1
-                         blrep = reshape(blrep,size(blrep,1),size(blrep,2)*nch);
+                if nch1 > 1
+                     blrep = reshape(blrep,size(blrep,1),size(blrep,2)*nch1);
                 end 
 %                  bspect = nan([size(W1,1) size(W1,2) nch^2]);
                  bspect = nan(size(W1));
@@ -230,6 +277,9 @@ switch lower(opts.type)
                           I2 = I1;
                           I1 = I1x;
                           blrep2 = blrep;
+                     elseif strcmpi(opts.type,'ppc')
+                        I3 = I2; 
+                        W3 = W2;
                      end
                       
                 % I1=V1;I2=V2;I3=V3;
@@ -243,7 +293,7 @@ switch lower(opts.type)
                         cblrep = conj(blrep2);
 
                      end
-                     if nch >1
+                     if nch2 >1
 %                          blrep = reshape(blrep,size(blrep,1),size(blrep,2)*nch);
                          blrep2 = reshape(blrep2,size(blrep2,1),size(blrep2,2)*nch2);
                          cblrep = reshape(cblrep,size(cblrep,1),size(cblrep,2)*nch2);
@@ -259,9 +309,10 @@ switch lower(opts.type)
                      bspect(inds) = sum(blrep(:,I1(inds)).*blrep2(:,I2(inds)).* cblrep(:,I3(inds)));
                     
                      NRM = nan(size(bspect));
+
                      bias =nan;
                      switch opts.normalization
-                         case 'bicoh'
+                         case {'bicoh','standard'}
                              NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds))).^2).* sum(abs(cblrep(:,I3(inds))).^2));
                          case 'awplv'
                              NRM(inds) = sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds))));
@@ -269,9 +320,12 @@ switch lower(opts.type)
                              NRM(inds) = sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds))));
                              bias = zeros(size(NRM));
                              bias(inds) = sqrt(sum((abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds)))).^2))./sum(abs(blrep(:,I1(inds)).*blrep2(:,I2(inds)).*cblrep(:,I3(inds))));
-                         otherwise
+                         case 'pac'
+                                   NRM(inds) = sqrt(sum(abs(blrep(:,I1(inds))).^2).*sum(abs(blrep2(:,I2(inds))).^2.*abs(cblrep(:,I3(inds))).^2));
+                     otherwise
                              error('Unrecognized normalization, %s',opts.normalization)
                      end
+
                      if opts.loopchan
                          bspects(:,:,:,chi) = bspect;
                          NRMs(:,:,:,chi) = NRM;
@@ -292,6 +346,8 @@ end
 out.BICOH = bspect./NRM;
 out.bspect = bspect;
 out.NRM = NRM;
+out.bw1=opts.bw1;
+out.bw2=opts.bw2;
 out.bias = bias;
 out.w1 = w1;
 out.w2 = w2;
@@ -311,15 +367,15 @@ if opts.do_decomp %%% Apply tensor or svd decomposition to the inputs
 
          end
 
-        if nch ==1 || strcmpi(opts.decomp,'svd') 
-            if nch >1
-                BICOH = reshape(out.BICOH,size(out.BICOH(:,:,1)).*[1 nch^2]);
+        if max(nch1,nch2) ==1 || strcmpi(opts.decomp,'svd') 
+            if max(nch1,nch2) >1
+                BICOH = reshape(out.BICOH,size(out.BICOH(:,:,1)).*[1 nch1*nch2]);
             else
                 BICOH = out.BICOH;
             end
             [u,l,v] = svd(BICOH); 
             getn = min(sum(diag(l)>0),opts.tdrank);
-            [uind,vind] = ndgrid(1:size(BICOH,1),1:size(BICOH,2),1:nch,1:nch);
+            [uind,vind] = ndgrid(1:size(BICOH,1),1:size(BICOH,2),1:nch1,1:nch2);
             U = u(uind(inds),1:getn);
             V = v(vind(inds),1:getn);
 
@@ -335,10 +391,10 @@ if opts.do_decomp %%% Apply tensor or svd decomposition to the inputs
             tdcomp.time = dbx1.time;
             tdcomp.u = u(:,1:getn);
             tdcomp.l = diag(l);
-            if nch ==1
+            if max(nch1,nch2) ==1
                 tdcomp.v = v(:,1:getn);
             else
-               tdcomp.v = reshape(v(:,1:getn), [size(v,1)/nch^2  nch nch2 getn]);
+               tdcomp.v = reshape(v(:,1:getn), [size(v,1)/(nch1*nch2)  nch1 nch2 getn]);
             end
             UMAT= (V.*conj(U))*diag(diag(l(1:getn,1:getn)).^-.5);
         else
@@ -346,7 +402,7 @@ if opts.do_decomp %%% Apply tensor or svd decomposition to the inputs
             getn = opts.tdrank;
             decomp = str2func(opts.decomp); 
             tdcomp = decomp(tensor(out.BICOH),opts.tdrank,opts.tdopts{:});
-            [u1ind,u2ind,ch1ind,ch2ind] = ndgrid(1:size(out.BICOH,1),1:size(out.BICOH,2),1:nch,chi+(1:nch2)-1);
+            [u1ind,u2ind,ch1ind,ch2ind] = ndgrid(1:size(out.BICOH,1),1:size(out.BICOH,2),1:nch1,chi+(1:nch2)-1);
              UMAT = conj((tdcomp.U{1}(u1ind(inds),:).*tdcomp.U{2}(u2ind(inds),:).*tdcomp.U{3}(ch1ind(inds),:).*tdcomp.U{4}(ch2ind(inds),:))*diag(sqrt(tdcomp.lambda).^-1));
             tdcomp = struct('tensor',tdcomp);
         end
