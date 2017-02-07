@@ -1,4 +1,4 @@
-function [dbout,PH,dbx]=blphase(x,fs,bw,varargin)
+function [dbout,PH,AMP,dbx]=blphase(x,fs,bw,varargin)
 
 %
 % [dbout,PH,dbx] = blphase(x,fs,bw)
@@ -62,8 +62,13 @@ dbout.blrep=S;
 
 if nargout > 1
     PH = zeros(dbx.Norig,length(dbout.frequency));
+    AMP = zeros(dbx.Norig,length(dbout.frequency));
     for k = 1:length(dbout.frequency), 
-        PH(:,k)=dbout.signal(k,1);
+        ph = dbout.signal(k,1);
+        ph= ph./abs(ph);
+        PH(:,k)=ph;
+        AMP(:,k)= dbx.signal(k)./real(ph); 
     end    
-    PH=PH./abs(PH);
+  %  PH=PH./abs(PH);
+    
 end

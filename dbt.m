@@ -443,7 +443,7 @@ classdef dbt
             if me.gpuEnable
                gpuarg = {'gpuArray'};
             else
-               gpuarg = {};
+               gpuarg = {class(me.blrep)};
            end
             if round(me.upsampleFx) ~= me.upsampleFx
                 error('\n%s does not currently allow signals to be reconstructed from a transform upsampled by a non-integer.',upper(mfilename))
