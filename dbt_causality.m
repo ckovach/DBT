@@ -53,7 +53,7 @@ for k = 1:length(dbx.frequency);
     end%     if any(ssR(:)>1)
 %         keyboard
 %     end
-    %k 
+    k 
 end
 for k =1:npar
     DSS(:,:,k) = cat(1,glm(:,k+1).dSSR);
