@@ -59,7 +59,7 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 % C Kovach 2013
 
 if nargin < 3 || isempty(bandwidth)
-   bandwidth = .05; % This seems to work well for constant line noise. For FM line noise try .25 or so. 
+   bandwidth = .1; % This seems to work well for constant line noise. For FM line noise try .25 or so. 
 end
 
 kurtosis_threshold = 10; % Apply a lower Z threshold to frequency points that have kurtosis above this value
@@ -79,11 +79,11 @@ zhithresh = 6;
 zlothresh = 3;
 flagthresh = 3;
 makeplots = false;
-smoothing_method = 'polynomial';
+smoothing_method = 'moving average'; % Default changed from polynomial method on 2/27/2017. CK
 adjust_threshold = true; % If true this performs an initial denoising run at a higher threshold if an excessive number of frequency bands are rejected (>15 %)
 prefilter_threshold = 10; % Percent rejected bands needed to trigger prefiltering at a higher threshold
 baseline_polyord = 10;
-smbw = 10;
+smbw = 10; %%% bandwidth for the baseline smoothing
 rm_edge_samples = 2; %Remove this many edge samples 
 i = 1;
 
@@ -206,12 +206,14 @@ end
 
 switch smoothing_method
     case 'polynomial'
-        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,baseline_polyord,include_times); %takes out the baseline by fitting a polynomial
-    case 'moving_average'
-        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,smoothing_method,nsmbw,include_times); %takes out the baseline by fitting a polynomial
-        
+        nsig = rmbaseline(blsig,w>=filter_above & kt<kurtosis_threshold,'smoothing method',smoothing_method,'polyord',baseline_polyord,'use time',include_times); %takes out the baseline by fitting a polynomial
+    case {'moving average','local'}
+        nsig = rmbaseline(blsig, kt<kurtosis_threshold,'smoothing method',smoothing_method,'smoothing bwN',nsmbw,'use time',include_times); %takes out the baseline by fitting a polynomial
+    otherwise
+        error('Unrecognized smoothing method')
 end
-mn = mean(abs(nsig(include_times,:,:)));
+nsig(nsig==0)=nan;
+mn = nanmean(log(abs(nsig(include_times,:,:))));
 
 
 %%% Compute z-score for mean power
