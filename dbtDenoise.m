@@ -27,14 +27,40 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %
 %    Keyword options:
 %       
-%       'remove spikes':  true - remove spikes at the default threshold (default)
-%                                before applying dbt-based denoising.
-%                         false - no spike removal
-%                         n (scalar) - remove spikes at specified threshold
-%                             Thresholding is applied iteratively to z-scores
-%                             across all remaining time points none remain above 
-%                             the threshold (see SPIKEFILTER).
+%        'makeplots' : Generate a plot showing the proportion of
+%                      coefficients discarded at each frequency.
 %
+%      Options that set control parameters for the filtering:
+%
+%       'filter above' :  Only apply filtering above this frequency.
+%      `                   Defaultis 40 Hz.
+%
+%       'adjust threshold' : true - Adjust the thresholds so that no more
+%                                    than 10% of coefficients are rejected, 
+%                                    then repeat filtering with the lower
+%                                    threshold (default).
+%                               n  - Adjust the thresholds so that no more
+%                                    than n% of coefficients are rejected,
+%                                    etc.
+%                              false - do not adjust thresholds. 
+% 
+%       'flag threshold'   : Z-score Threshold at which to identify a given 
+%                               band as potentially contaminated.
+% 
+%       'smoothing method' : Method used to estimate the baseline (noise-free)
+%                                spectrum (see RMBASELINE) 
+%                             'moving average' - Baseline is computed iteratively 
+%                                as a local average in the frequency domain, 
+%                                excluding points that deviate more than 3 
+%                                stdev at each step (Default as of rev. 801 2/27/2017).
+%                             'local' - as above except applied within a
+%                                local moving 5 pt. time window.
+%                              'polynomial' - estimate baseline sepctrum as a 10th
+%                                order polynomial (Default before rev. 801).
+%
+%       'smoothing polyord' :  Order of the polynomial used for the
+%                               polynomial smoothing option above (Default = 10).
+% 
 %       'kthresh'      :  kurtosis threshold. Coefficients in frequency bands for which
 %                             kurtosis over time falls above this value are
 %                             thresholded at 'zlothreshold' and otherwise at
@@ -42,10 +68,25 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %                             kurtosis is useful for detecting frequency
 %                             modulated line noise. Default = 10.
 %                         
-%      'zhithresh'     : Threshold for coefficient removal. (default=6)
+%      'zhithresh'     : Threshold for coefficient removal. (Default=6)
 %       
 %      'zlothresh'     : Threshold for coefficient removal in frequency
-%                        banbds that fall above 'kthresh'. (default = 3).
+%                        banbds that fall above 'kthresh'. (Default = 3).
+%       
+%      Options related to removal of high amplitude artifacts (see SPIKEFILTER):
+%
+%       'remove spikes':  true - remove spikes at the default threshold (default)
+%                                before applying dbt-based denoising.
+%       'spike opts'   :  Option structure for spike exclusion (see SPIKEFILTER)
+%                         false - no spike removal
+%                         n (scalar) - remove spikes at specified threshold
+%                             Thresholding is applied by iteratively discarding 
+%                               samples that deviate from the mean by at least
+%                               n standard deviations until none remain above 
+%                               the threshold (Default = 10).
+%       'spike window' :  % Width of the time window used to remove spikes
+%                         (default = .2, with default Hann window)
+%
 %       
 % See also DBT, SPIKEFILTER
 
@@ -91,11 +132,11 @@ argin = varargin;
 
 while i <= length(varargin)
           switch lower(varargin{i})
-
-           case {'dbt'}  % use stft instead of dbt
-                  use_stft = false;                        
-                  varargin(i) = [];
-                  %i = i-1;
+% 
+%            case {'dbt'}  % use stft instead of dbt
+%                   use_stft = false;                        
+%                   varargin(i) = [];
+%                   %i = i-1;
               case {'kurtosis','kthresh'}  % Apply a lower filter threshold for frequency values that have kurtosis exceeding this value
                   kurtosis_threshold = varargin{i+1};
                   varargin(i:i+1) = [];
