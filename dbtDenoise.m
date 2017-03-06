@@ -88,7 +88,7 @@ function [xdn,F,blsig,spike] = dbtDenoise(x,fs,bandwidth,varargin)
 %                         (default = .2, with default Hann window)
 %
 %       
-% See also DBT, SPIKEFILTER
+% See also DBT, SPIKEFILTER, RMBASELINE
 
 % ----------- SVN REVISION INFO ------------------
 % $URL$
