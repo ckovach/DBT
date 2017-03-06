@@ -2,8 +2,35 @@
 function [out,bl] = rmbaseline(bx,usepts,varargin)
 
 
-% Fits a polynomial to the spectrum and normalizes by the fitted value.
-
+% [out,bl] = rmbaseline(bx,usepts,varargin)
+%
+% Normalizes a time-frequency plot with an estimated baseline spectrum.
+%
+% Keyword options:
+%       'smoothing method' : Method used to estimate the baseline (noise-free)
+%                                spectrum (see RMBASELINE) 
+%                             'moving average' - Baseline is computed iteratively 
+%                                as a local average in the frequency domain, 
+%                                excluding points that deviate more than 3 
+%                                stdev at each step (Default as of rev. 801 2/27/2017).
+%                             'local' - as above except applied within a
+%                                local moving time window.
+%                              'polynomial' - estimate baseline sepctrum as a 10th
+%                                order polynomial (Default before rev. 801).
+% 
+%       'smoothbw'          : Bandwidth of the frequency smoothing winow
+%                             used to obtain the local average for the 'moving
+%                             average' and 'local' methods (Default = 10 Hz).
+% 
+%       'smoothbwn'         : Same as above except expressed as a number of
+%                             frequency samples. 
+% 
+%       'local_time_windown': Number of time samples within the moving
+%                             window used for the 'local' option.
+% 
+%       'smoothing polyord' :  Order of the polynomial used for the
+%                               'polynomial' smoothing option (Default = 10).
+%
 % C Kovach 2013
 % 
 % ----------- SVN REVISION INFO ------------------
@@ -36,13 +63,13 @@ while i <= length(varargin)
         case 'polyord'
             polyord = varargin{i+1};                    
             i = i+1;
-        case {'smoothing bandwidth','smoothbw'}
-            smoothn = varargin{i+1};                    
-            i = i+1; 
+         case {'smoothing bandwidth','smoothbw'}
+             smoothbw = varargin{i+1};                    
+             i = i+1; 
         case 'smoothing threshold'
             smooth_threshold = varargin{i+1};                    
             i = i+1; 
-        case 'local_time_windowN'
+        case 'local_time_windown'
             local_time_smoothingN = varargin{i+1};                    
             i = i+1; 
         case {'smooth bwn','smoothing bwn'}
