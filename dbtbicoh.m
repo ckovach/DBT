@@ -1,4 +1,4 @@
-function [out,dbx] = dbtbicoh(x1,x2,varargin)
+function [out,dbx,indices] = dbtbicoh(x1,x2,varargin)
 
 %
 % [out,dbx] = dbtbicoh(x1,x2,fs,bw,varargin)
@@ -25,6 +25,8 @@ dbx2 = [];
 if isa(x1,'dbt')
     if isscalar(x1)
         dbx1 = x1;        
+        bw1 = dbx1.bandwidth;
+        fs = dbx1.fullFS;
     else
         dbx1=x1(1);
         dbx2 =x1(2);
@@ -34,6 +36,7 @@ end
 if isscalar(x2)
     if isa(x2,'dbt')
         dbx2 = x2;
+        bw2 = dbx2.bandwidth;
     elseif isnumeric(x2)
         fs = x2;
         bw=varargin{1};
@@ -49,7 +52,7 @@ end
 
 
 opts = struct(...
-'bw1',bw,...
+'bw1',bw1,...
 'bw2x',1,...
 'symmetric',false,...
 'upsampfx',0,...
@@ -63,9 +66,10 @@ opts = struct(...
 'w1lim',Inf,...
 'w2lim',Inf,...
 'loopchan',true,...
-'normalization','bicoh');
+'normalization','bicoh',...
+'wrap',false);
 
-if nargin > 3 && isstruct(varargin{1})
+if length(varargin)> 0 && isstruct(varargin{1})
     newopts = varargin{1};
     fn = fieldnames(newopts);
     for k = 1:length(fn)
@@ -127,6 +131,9 @@ while i < length(varargin)
           i = i+1;
       case {'loopchan'} % copmute cross-bicoherece in loop rather than vectorized (for the sake of memory)
          opts.loopchan = varargin{i+1};
+          i = i+1;
+      case {'wrap'} % wrap the spectrum so that values are sampled modulo nyquist.
+         opts.wrap = varargin{i+1};
           i = i+1;
         case {'normalization'} % copmute cross-bicoherece in loop rather than vectorized (for the sake of memory)
          opts.normalization = varargin{i+1};
@@ -199,8 +206,12 @@ switch lower(opts.type)
                      otherwise
                          
                          upsamptx = 1;
-                          dbx1 = dbt(x1,fs,opts.bw1,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx*opts.bw2x-1,'lowpass',lpf,'gpu',false);
-                         if isscalar(x2)
+                         if isa(x1,'dbt')
+                             dbx1 = x1;
+                         else
+                              dbx1 = dbt(x1,fs,opts.bw1,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx*opts.bw2x-1,'lowpass',lpf,'gpu',false);
+                         end
+                          if isscalar(x2)
                             dbx2 = dbx1;
                          else
                             dbx2 = dbt(x2,fs,opts.bw2,'upsampleFx',opts.upsampfx,'remodphase',false,'upsampleTx',upsamptx-1,'lowpass',lpf,'gpu',false);
@@ -244,7 +255,7 @@ switch lower(opts.type)
                              WCh1 = 1;
                              WCh2 = 1;
                          end
-                         W3 = round((w1(W1)+w2(W2)-w2(1))./fstep3)+1;
+                         F3 = w1(W1)+w2(W2)-w2(1);
                          
                          w2 = w2(1:opts.bw2x:sum(getf2));
 %                      case 'vv'
@@ -254,9 +265,17 @@ switch lower(opts.type)
 %                         W3 = 2*V1-1;
 
                  end
-             
+%                  if opts.wrap
+%                     F3 = mod(F3+dbx1.fullFS/2,dbx1.fullFS)-dbx1.fullFS/2;
+%                  end
+%                  W3 = (round(abs(F3)./fstep3)+1).*sign(F3);
+                 W3 = round(F3./fstep3)+1;
                  %  inds = W3<=length(dbx.frequency);
-                 inds = W1>0 & W2 <=sum(getf2)& W3<=max(find(keepf2));
+                 if ~opts.wrap
+                     inds = W1>0 & W2 <=sum(getf2)& abs(W3)<=sum(keepf2);
+                 else
+                     inds= W1>0 & W2 <=sum(getf2);
+                 end
                  if ~opts.symmetric
                     inds = inds & W1 <=W2; 
                  end
@@ -297,6 +316,14 @@ switch lower(opts.type)
 %                          blrep = reshape(blrep,size(blrep,1),size(blrep,2)*nch);
                          blrep2 = reshape(blrep2,size(blrep2,1),size(blrep2,2)*nch2);
                          cblrep = reshape(cblrep,size(cblrep,1),size(cblrep,2)*nch2);
+                     end
+                     if opts.wrap
+                         nyqf = min(dbx2.frequency(end),dbx2.fullFS/2);
+                         wrapind = F3 >nyqf;
+                         wrI = I3(wrapind);
+                         [unq,unqi] = unique(F3(wrapind));
+                         wrneg = (2*nyqf-unq)/fstep3+1;
+                         cblrep(:,wrI(unqi))=conj(cblrep(:,wrneg));
                      end
     %                   elseif  strcmpi(opts.type,'bnb')
     %                           cblrep = conj(blrep);
@@ -415,5 +442,9 @@ else
          tdcomp = [];
 end
 
+out.nyqf = dbx1.fullFS/2;
 out.tdcomp = tdcomp;
 
+if nargout > 2
+    indices = [I1(inds),I2(inds),I3(inds)];
+end

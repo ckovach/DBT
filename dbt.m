@@ -17,7 +17,7 @@ classdef dbt
 %
 %  B.blrep: time-frequency coefficients with rows corresponding to time
 %           and columns to frequency. If X is a matrix, channels correspond to the
-%           3rd dimension.
+%           3rd dimension.help 
 %   .bandwidth:  bandwidth of the DBT.
 %   .sampling_rate: sampling rate after the transform.
 %   .time:  sampled time points.
@@ -197,7 +197,6 @@ classdef dbt
                     case 'cospower'
                       me.cospower = varargin{i+1};
                       i=i+1;
-                      using_gpu_default_setting = false;
                   otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
