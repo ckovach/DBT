@@ -110,7 +110,7 @@ classdef dbt
         cospower=1;       % If greater than 1 applies a power-of-cosine window, cos(f)^cospower, in the frequency domain
                           %   cospower=2 is the same as a Hann window. Default is the simple cosine window (cospower=1).  
        
-        gpuEnable = true; % Use GPU processor if available;
+        gpuEnable = false; % Use GPU processor if available;
         bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
