@@ -40,7 +40,7 @@ function [out,bl] = rmbaseline(bx,usepts,varargin)
 % $Author$
 % ------------------------------------------------
 
-smoothing_method = 'moving average';
+smoothing_method = 'local';
  polyord = 8;
 %%% the following apply to moving average and local smoothing
 smoothbwn=0;
