@@ -98,7 +98,7 @@ while i < length(varargin)
       case {'w2lim'}
           opts.w2lim= varargin{i+1};
           i = i+1;
-      case {'maxfreq'}
+      case {'maxfreq','lowpass'}
           opts.maxfreq = varargin{i+1};
           i = i+1;
       case {'upsampfx'}
