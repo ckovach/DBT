@@ -38,9 +38,17 @@ function [out,pspindices] = pspect(S,varargin)
 %           .reconmat: reconstruct into the same shape and size as psp.pspect. 
 %
 %
+% [psp,pspindices] = pspect({S1,S2,..,Sk},{f1,f2,...,fk},order,[options)
+% 
+%   Input may alternatively be a cell array of time-frequency matrices, in
+%   which case each term in the polyspectral product is taken from the 
+%   respective matrix. This allows different filters to specified for each
+%   term.
+%
+%
 % [psp,pspindices] = pspect(dbx,order,[options)
 % 
-%   Input may alternatively be a dbt object.
+%   Input may alternatively be a dbt object or dbt object array.
 %
 %
 % See also DBT
@@ -57,19 +65,37 @@ options.round_freq = true; % Round to the nearest frequency band if necessary.
 options.tolerance = []; % Rounding tolerance (defaults to min(diff(f))).
 %options.real_signal=true;
 
+axes_interchangeable = isnumeric(S) || length(S)==1;
 
 if isa(S,'dbt')
-    f = S.frequency;
-    S = S.blrep;
+    
     order = varargin{1};
+    dbx = S;
+    dbx(end+1:order)=dbx(end);
+    
+    fs = {dbx.frequency};
+    mint = min(arrayfun(@(d)d.time(end),dbx));
+    S={};
+    for k = 1:order
+        S{k} = dbx(k).blrep(dbx(k).time<=mint,:);
+    end
     varargin(1)=[];
 else
     f = varargin{1};
     order=varargin{2};
     varargin(1:2)=[];
-end
-if isempty(options.tolerance)
-    options.tolerance = min(diff(sort(f))); 
+    if ~iscell(S)
+        S = repmat({S},1,order);
+    else
+        S(end+1:order)=S(end);
+    end
+    if ~iscell(f)
+         fs = repmat({f},1,order-1);
+    else
+        fs=f;
+        fs(end+1:order)=f;
+    end
+
 end
 
 
@@ -94,44 +120,45 @@ while i <length(varargin)
 end
 
 if isscalar(options.lowpass)
-    options.lowpass = options.lowpass*ones(1,order-1);
+    options.lowpass = options.lowpass*ones(1,order);
 end
 
 if isscalar(options.highpass)
-    options.highpass = options.highpass*ones(1,order-1);
-end
-
-if options.full_range
-    sindx = 1:size(S,2);
-    [f,srtf] = unique([f,-f]);
-    sifull = [sindx,sindx];
-    sconj = [false(size(sindx)),true(size(sindx))];
-    sconj=sconj(srtf);
-    
-    resortindex = sifull(srtf);
-    S = S(:,resortindex);
-    S(:,sconj) = conj(S(:,sconj));
-    
-else
-    resortindex = 1:size(S,2);
-    sconj = false(size(resortindex));
+    options.highpass = options.highpass*ones(1,order);
 end
 
 
-% if ~options.symmetrize
-     fs = repmat({f},1,order-1);
-% else
-%     n1 = 1/(order-1);
-%     fs = {f};
-%     for k = 2:order-1
-%         fs{k} = f-n1*f;
-%     end
-% end
+
+if isempty(options.tolerance)
+    options.tolerance = cellfun(@(f)min(diff(sort(f))),fs); 
+end
+
 fs = arrayfun(@(f,highpass,lowpass)f{1}(abs(f{1})>=highpass & abs(f{1})<=lowpass),fs,options.highpass,options.lowpass,'uniformoutput',false);
 
 
-W = fs;
-[W{:}] = ndgrid(fs{:});
+for k =1:order
+    Sk=S{k};
+    if options.full_range
+
+        sindx = 1:size(Sk,2);
+        f=fs{k};
+        [fs{k},srtf] = unique([f,-f]);
+        sifull = [sindx,sindx];
+        sconj{k} = [false(size(sindx)),true(size(sindx))];
+        sconj{k}=sconj{k}(srtf);
+
+        resortindex{k} = sifull(srtf);
+        Sk = Sk(:,resortindex{k});
+        Sk(:,sconj{k}) = conj(Sk(:,sconj{k}));
+        S{k}=Sk;
+    else
+        resortindex{k} = 1:size(Sk,2); %#ok<*AGROW>
+        sconj{k} = false(size(resortindex));
+    end
+end
+
+W = fs(1:order-1);
+[W{:}] = ndgrid(fs{1:order-1});
 % W{order} = -sum(cat(order,W{:}),order);
 
 if ~options.symmetrize
@@ -143,7 +170,9 @@ end
 
 WW = [WW{:}];
 WW(:,order) = -sum(WW,2);
-WW = sort(WW,2);
+if axes_interchangeable
+    WW = sort(WW,2);
+end
 
 % unique combinations only
 [wunq] = unique(WW,'rows');
@@ -152,16 +181,20 @@ wunq(any(abs(wunq)>max(abs(f)),2) | abs(wunq(:,order))>options.maxfreq,:)=[];
 [cpart,cindx] = ismember(sort(-WW(~ism,:),2),wunq,'rows');
 indx(~ism)=cindx;
 
-[fism,findx] = ismember(round(wunq./options.tolerance),round(f./options.tolerance));
 
-[~,findx(~fism)] = ismember(-wunq(~fism),f);
 
 PS = 1;
 NORM = 1;
 for k = 1:order
+    [fism,findx] = ismember(round(wunq(:,k)./options.tolerance(k)),round(fs{k}./options.tolerance(k)));
+
+    [~,findx(~fism)] = ismember(round(-wunq(~fism,k)./options.tolerance(k)),round(fs{k}./options.tolerance(k)));
     
-    F = S(:,findx(:,k));
-    F(:,~fism(:,k)) = conj(F(:,~fism(:,k)));
+    fisms(:,k)=fism;
+    findxs(:,k)=findx;
+    
+    F = S{k}(:,findx);
+    F(:,~fism) = conj(F(:,~fism));
     PS = PS.*F;
     
     
@@ -193,7 +226,7 @@ rmat = reshape(indx,size(W{1}));
 
 
 out.pspect = psp(rmat);
-out.fs = fs;
+out.fs = fs(1:2);
 
 switch options.normalization
     case  {'awplv'}
@@ -218,11 +251,19 @@ switch options.normalization
   
 end
 
-out.options = options;tic
+out.options = options;
 
 if nargout >1
-    pspindices.findex = resortindex(findx);
-    pspindices.conjugate = xor(fism,sconj(findx));
+    if axes_interchangeable
+        pspindices.findex = resortindex{1}(findxs);
+        pspindices.conjugate = xor(fisms,sconj{1}(findxs));
+    else
+        for k =1:order
+            pspindices.findex(:,k) = resortindex{k}(findxs(:,k));
+            pspindices.conjugate = xor(fisms(:,k),sconj{k}(findxs(:,k))');
+        end
+    end
     pspindices.reconmat = rmat;
+        
 end
 
