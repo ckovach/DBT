@@ -55,6 +55,7 @@ options.full_range = true; % Add negative frequencies if they are not already in
 options.symmetrize = false;
 options.round_freq = true; % Round to the nearest frequency band if necessary.
 options.tolerance = []; % Rounding tolerance (defaults to min(diff(f))).
+options.getbias = true;
 %options.real_signal=true;
 
 
@@ -198,11 +199,14 @@ out.fs = fs;
 switch options.normalization
     case  {'awplv'}
         nrm = sum(NORM);
+        if options.getbias
+            nrm2 = sum(NORM.*NORM);
+            bias = sqrt(nrm2./nrm.^2);
+             bias(end+1)=0;
+            out.bias = bias(rmat);
+        end
         nrm(end+1)=1;
         out.normalization = nrm(rmat);
-        bias = sqrt(sum(NORM.^2)./sum(NORM).^2);
-        bias(end+1)=0;
-        out.bias = bias(rmat);
     case 'polycoh'        
         nrm = sqrt(sum(abs(NORM(:,:,1)).^2).*sum(NORM(:,:,2)));
         nrm(end+1)=1;
@@ -213,7 +217,7 @@ switch options.normalization
         nrm(end+1)=1;
         out.normalization = nrm(rmat);
         out.bias = nan;
-     case {'','none'}
+    case {'','none'}
         out.normalization = 1;
   
 end
