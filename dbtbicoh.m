@@ -39,13 +39,13 @@ if isscalar(x2)
         bw2 = dbx2.bandwidth;
     elseif isnumeric(x2)
         fs = x2;
-        bw=varargin{1};
+        bw1=varargin{1};
         varargin(1)=[];
         x2 = x1;
     end
 elseif isnumeric(x2)
     fs = varargin{1};
-    bw = varargin{2};
+    bw1 = varargin{2};
     varargin(1:2)=[];
 end
     
