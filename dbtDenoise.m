@@ -104,7 +104,12 @@ if nargin < 3 || isempty(bandwidth)
 end
 
 kurtosis_threshold = 10; % Apply a lower Z threshold to frequency points that have kurtosis above this value
-spike.remove_spikes = true;  % Zero out time points that exceed some threshold
+spike.remove_spikes = true;  % Zero out time points that exceed some threshold before applyng dbt denoising.
+                             % See SPIKEFILTER. This is advisable to avoid  time-leakage resulting from the filtering of large-amplitude spikes.
+spike.keep_spikes = false;  % If remove_spikes and keep_spikes are both true, then noise is estmated 
+                            % using the despiked data, but the spikes are retained in the final result,
+                            % which is the origin signal minus the noise recovered from despiked data. 
+                            % 
 spike.threshold = 10; % This is the threshold used in detecting spikes. 
                       % Z-score is computed iteratively until
                       % no points exceed this value. The threshold is set
@@ -154,6 +159,15 @@ while i <= length(varargin)
                   end
                   varargin(i:i+1) = [];
                   i = i-1;
+                  
+               case {'keep spikes'} % If the 'remove spikes' and 'keep spikes' options are both true, then 
+                                    % spikes are removed for the purpose of
+                                    % estimating noise, but retained in the
+                                    % denoised signal.
+                  spike.keep_spikes = varargin{i+1};
+                  varargin(i:i+1) = [];
+                  i = i-1;
+                  
                  case {'spike window'}  % spike window widht 
                     spike.smoothwindow = varargin{i+1};
                     varargin(i:i+1) = [];
@@ -219,6 +233,9 @@ end
 shoulder  = 1; %This is overridden if passed as an argument in varargin
 
 if spike.remove_spikes    
+    if spike.keep_spikes
+        xorig = x;
+    end
     [x,spike] = spikefilter(x,fs,spike);
 end
 
@@ -299,7 +316,10 @@ blsig.blrep = blsig.blrep.*F;
 xdn = blsig.signal;
 
 xdn = xdn(1:length(x));
-
+if spike.remove_spikes && spike.keep_spikes
+    noise = x-xdn;
+    xdn = xorig-noise;
+end
 
 if makeplots
 %    dnnsig = blsig.blrep; 
