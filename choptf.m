@@ -1,4 +1,4 @@
-function [CH,tt,T] = choptf(trg,times,db,trref,normalization)
+function [CH,tt,T,Err] = choptf(trg,times,db,trref,normalization)
 
 % [CH,tt] = choptf(trange,evnt_times,db,trref)
 % Chop dbt data into epochs and normalize 
@@ -11,6 +11,13 @@ function [CH,tt,T] = choptf(trg,times,db,trref,normalization)
 %         each corresponding trial epoch.
 %         For no normalization leave empty (default)
 % see also DBT
+
+% ----------- SVN REVISION INFO ------------------
+% $URL$
+% $Revision$
+% $Date$
+% $Author$
+% ------------------------------------------------
 
 %C. Kovach 2014
 
@@ -28,6 +35,12 @@ end
 adjust_phase = db.remodphase; %Correct phase for rounding error
                               %if phase information is preserved.
                               
+if db.gpuEnable
+    gpuarg ={'gpuArray'};
+else
+    gpuarg ={};
+end
+
 [T,tt,Err]= chopper(trg,times,db.sampling_rate);
 
 Err(T<1|T>length(db.time)) = 0;
@@ -50,7 +63,7 @@ end
 
 x = ones(length(db.time)+1,1);
 nch = size(db.blrep,3);
-CH = zeros([length(tt),length(db.frequency),size(T,2), nch]);
+CH = zeros([length(tt),length(db.frequency),size(T,2), nch],gpuarg{:});
 for i = 1:nch
     for k = 1:length(db.frequency)
 

@@ -17,7 +17,13 @@ function [xypac,dbamp,dbph] = dbtpac(X,Y,fs,varargin)
 % 
 % See also DBTCOH, DBT
 
-% C. Kovach 2014
+
+% ----------- SVN REVISION INFO ------------------
+% $URL$
+% $Revision$
+% $Date$
+% $Author$
+% ------------------------------------------------
 
 phasebw = [];
 ampbw =40; 
@@ -40,17 +46,19 @@ csd =[];
 cohargs = {};
 dbtargs = {};
 do_permtest = false;
+aPLV = false;
+ampargs = {};
 % if nargin <3 && isa(X,'dbt')
 %     fs = X.fullFS;
 % end
 % phasefs=fs;
 
 i = 1;
-while i < length(varargin)
+while i <= length(varargin)
     
    switch varargin{i}
        
-       case 'phasebw'
+       case {'phasebw','phbw'}
            phasebw = varargin{i+1};
            i = i+1;
        
@@ -96,6 +104,17 @@ while i < length(varargin)
        case 'do_permtest'
            do_permtest = varargin{i+1};
            i = i+1;
+        case {'plv','blplv','blpl','aplv','coh'}
+           cohargs = [cohargs,{'type',varargin{i}}];
+        case {'cohargs'}
+           cohargs = [cohargs,varargin{i+1}];
+           i = i+1;
+        case {'phargs'}
+           cohargs = [phargs,varargin{i+1}];
+           i = i+1;
+        case {'ampargs'}
+           ampargs = [ampargs,varargin{i+1}];
+           i = i+1;
        otherwise
            error('Unrecognized keyword %s',varargin{i})
    end
@@ -104,7 +123,7 @@ end
 
 
     
-ampargs = {fs,ampbw,'padding','time','lowpass',min(amprange(2),fs/2),'offset',amprange(1),dbtargs{:}};
+ampargs = {fs,ampbw,'padding','time','lowpass',min(amprange(2),fs/2),'offset',amprange(1),dbtargs{:},ampargs{:}};
 dbamp = dbt(Y,ampargs{:}); %%% DBT from which band-limited amplitude will be obtained. 
 ampfs = dbamp.sampling_rate;
 
@@ -115,7 +134,7 @@ end
 if isempty(phasebw)
     %%% If no other bandwidth is specified default to a reasonable value
     %%% based on the amplitude bandwidth.
-   phasebw = ampbw/length(dbamp.time)*100; 
+   phasebw = ampbw/length(dbamp.time)*400; 
 end
 
 if isempty(keep_time)
@@ -129,17 +148,18 @@ Xrs(end+1:length(dbamp.time),:,:) =0;
 Pperm =[];
 phargs = {phasebw,'padding','time','lowpass',min(phaserange(2),fs/2),'offset',phaserange(1),'keep time',keepT,phargs{:},dbtargs{:}}; %#ok<*CCAT>
 fprintf('\nBand: %4i',0)
+scalar_trans = @(x)log(x);
 for k = 1:length(dbamp.frequency)   
     fprintf('\b\b\b\b%4i',k)
     if get_trf
-        [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});
+        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:)] = dbtcoh(Xrs,scalar_trans(squeeze(abs(dbamp.blrep(:,k,:)))),ampfs,phargs{:},cohargs{:});
     elseif do_permtest
-         [PAC(:,:,k,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
+         [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph,trf(:,:,k,:,:),Pperm(:,:,k,:,:)] = dbtcoh(Xrs,scalar_trans(squeeze(abs(dbamp.blrep(:,k,:)))),ampfs,phargs{:},cohargs{:});        
     else
-        [PAC(:,:,k,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,squeeze(abs(dbamp.blrep(:,k,:))),ampfs,phargs{:},cohargs{:});        
+        [PAC(:,:,k,:,:,:),c,phfreq,tt,dbph] = dbtcoh(Xrs,scalar_trans(squeeze(abs(dbamp.blrep(:,k,:)))),ampfs,phargs{:},cohargs{:});        
     end
     if get_csd
-        csd(:,:,k,:,:) = c;
+        csd(:,:,k,:,:,:) = c;
     end
 end
 

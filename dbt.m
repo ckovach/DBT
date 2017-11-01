@@ -11,44 +11,48 @@ classdef dbt
 %  BW - Bandwidth of decomposition
 % 
 %
+%  B = dbt(X,Fs,Bw, ['option'], [value])
+%
 %  B is an object with the following properties:
 %
 %  B.blrep: time-frequency coefficients with rows corresponding to time
 %           and columns to frequency. If X is a matrix, channels correspond to the
-%           3rd dimension.
+%           3rd dimension.help 
 %   .bandwidth:  bandwidth of the DBT.
 %   .sampling_rate: sampling rate after the transform.
 %   .time:  sampled time points.
-%   .frequency: sampled center frequencies. Note that with upsampling, in order 
-%      		to simplify bookkeeping, the DBT matrix may include bands whose 
-%               center frequency is negative or greater than nyquist.
+%   .frequency: sampled center frequencies.
 %   .bands: band limits for each frequency band.
 %   .taper: taper used to window frequency bands.
+%   .padding: whether signal duration is adjusted through time padding
+%             ('time') or fequency padding ('frequency').
 %   .fftpad: degree of oversampling achieved through fft padding. 1
 %            corresponds to 2x oversampling.
-%   .centerDC: If false, the fft of the DBT bands contains
+%   .centerDC: If false (default), the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
-%               otherwise each band is demodulated to be centered on DC (default).
-%
-%   
-%  B = dbt(X,Fs,Bw, ['option'], [value])
+%               otherwise each band is demodulated to be centered on DC.
+%   .cospower: Power applied to the window (default = 1). Setting cospower=2
+%                gives a Hann window for the default window (with 
+%                shoulder = 1). Frequency upsampling is adjusted by default
+%                to maintain a tight frame.
 %
 %  Options:
 %
 %  	offset   -  offset of the first band from 0hz (default = 0)
+%   padding  - 'time' (default) or 'none': pad signal in the time domain to
+%                adjust bandwidth.
 %   shoulder - (0 - 1) degree of overlap between neighboring bands (default = 1). 
 %                  Note that, at present, 1 is the maximum allowable value.
 %
 %      The overlapping portions of the bands are windowed with a  taper:
 %              ____   __________   ________   _________
 %                  \ /	        \ /        \ /   
-%    .  .  .	    X            X          X           . . . 
+%     .  .  .	    X            X          X           . . . 
 %                  / \	        / \        / \
 %                  |-----------|           |-|
 %                   BW              shoulder
 %      
-%       By default,  the taper is defined so that the square of overlapping
-%          regions sum to 1.
+%       By default,  the taper is defined so that squares sum to 1
 %
 %  upsampleFx: upsample the frequency scale by a factor of (1+x) (default x
 %              = 0, no upsampling ).
@@ -71,8 +75,13 @@ classdef dbt
 
 %     C Kovach 2013 - 2015
 % 
+% ----------- SVN REVISION INFO ------------------
+% $URL$
+% $Revision$
+% $Date$
+% $Author$
+% ------------------------------------------------
 
-% Please cite: C. K. Kovach, P. E. Gander, The demodulated band transform. Journal of Neuroscience Methods 261, 135-154 (2016).
 
     properties 
         
@@ -93,16 +102,21 @@ classdef dbt
         upsampleFx = 0; %Amount by which to oversample the frequency dimension.
         userdata=[];
         centerDC = true; % If true, bands are demodulated to [-bandwidth bandwidth], otherwise to [0 bandwidth] with zero padding to 2*bandwidth.
-                          % If true, the pass band is centered at 0, so
-                          % that the signal contains negative
-                          % frequencies, which halves the number of
-                          % samples.
+                          %  If true, the pass band is centered at 0, so
+                          %  that the signal contains negative
+                          %  frequencies, which halves the number of
+                          %  samples.
                           
-         bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
+        cospower=1;       % If greater than 1 applies a power-of-cosine window, cos(f)^cospower, in the frequency domain
+                          %   cospower=2 is the same as a Hann window. Default is the simple cosine window (cospower=1).  
+       
+        gpuEnable = false; % Use GPU processor if available;
+        bwtol = 1e-8;    % Tolerance for the bandwidth. Higher values set the bandwidth more precisely but require more padding.           
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
                             % correct average when averaging the raw spectrum over time.
           padding = 'time'; % Options are 'time' or 'none'; 'frequency' is obsolete.
+        inputargs = {};
     end    
     
     methods
@@ -111,9 +125,11 @@ classdef dbt
             
             me.taper = taper; %#ok<CPROP>
             
-            %%% This loop sets options based on keyword arguments.
+           
+            using_gpu_default_setting = true;
+            
             i = 4;       
-           while i < length(varargin)
+            while i < length(varargin)
               switch lower(varargin{i})
                   
                   case {'offset','highpass'}
@@ -174,7 +190,14 @@ classdef dbt
                   case 'bwtol'
                       me.bwtol = varargin{i+1};
                       i=i+1;
-                   otherwise
+                  case 'gpu'
+                      me.gpuEnable = varargin{i+1};
+                      i=i+1;
+                      using_gpu_default_setting = false;
+                    case 'cospower'
+                      me.cospower = varargin{i+1};
+                      i=i+1;
+                  otherwise
                      error('Unrecognized keyword %s',varargin{i})
               end
               i = i+1;
@@ -183,12 +206,31 @@ classdef dbt
            if isempty(varargin)
                return
            end
+           if using_gpu_default_setting && me.gpuEnable
+                try % Use gpu by default when possible
+                    me.gpuEnable = gpuDeviceCount>0;
+                catch
+                    me.gpuEnable = false;
+                end
+           elseif me.gpuEnable && gpuDeviceCount==0               
+                   warning('No GPU device detected. Switching to non-GPU mode')
+                   me.gpuEnable = false;
+           end
+           
+        
+           me.upsampleFx = me.upsampleFx + me.cospower - 1;
            
            fs  = varargin{2};
-           bw =  varargin{3};
-           
+           bw =  varargin{3};           
            fullsig  = varargin{1};
-           
+           me.inputargs = varargin(4:end);
+
+          if me.gpuEnable
+               gpuarg = {'gpuArray'};
+           elseif ~isa(class(fullsig),'double')
+                gpuarg = {class(fullsig)};
+           end
+          
            n = size(fullsig,1);
            ncol = size(fullsig,2);
            
@@ -213,15 +255,14 @@ classdef dbt
                    me.bwtol = Inf;
            end
                    
-            %%% Pad signal in time so that bandwidth approximately
-            %%% divides padded duration 
+            %%% Pad signal in time so that bandwidth sapproximately
+            %%% divides padded duration duration
             
 %             [~,den] = rat(bw/fs/2,me.bwtol);
-            stepsize = bw/(me.upsampleFx +1);   
-            
-            %%% Signal padding will ensure that the resulting bandwidth falls within some tolerance of the 
-            %%% target velue. Tolerance is determined by the bwtol property.
+            stepsize = bw/(me.upsampleFx +1);           
             [~,den] = rat(stepsize/fs/2,me.bwtol);
+
+           
            
            newn = ceil(n/den)*den;
            newT = newn/fs;
@@ -264,8 +305,9 @@ classdef dbt
 %         foffset = me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize;
            % This adjusts the high-pass offset so it is an integer multiple of
            % frequency sampling
-           foffset = floor((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
-           noffset = round(foffset*newT );
+%           foffset = ceil((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
+           foffset = round((me.offset-newbw*(1+me.shoulder)/2 - me.upsampleFx*stepsize)*newT)/newT;
+           noffset = floor(foffset*newT );
            foffset=noffset/newT;
            me.offset = foffset + newbw*(1+me.shoulder)/2;
            
@@ -286,8 +328,8 @@ classdef dbt
            rsmat = mod(rsmat-1,newn)+1;
            %dcindx = find(rsmat==1);
 
-             tp = me.taper.make((0:1:nsh-1)/nsh); 
-            invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+             tp = me.taper.make((0:1:nsh-1)/nsh).^me.cospower; 
+            invtaper = me.taper.make(1-(0:1:nsh-1)/nsh).^me.cospower;
 
            switch me.direction
             %%% Approximate causal or anti-causal filters while
@@ -307,24 +349,32 @@ classdef dbt
                    error('Unrecognized filter direction, %s.',me.direction)
            end
 
-           Frs = zeros([size(rsmat),ncol]);
+           Frs = zeros([size(rsmat),ncol],gpuarg{:});
            for  k = 1:ncol
                 f = F(:,k);
-               Frs(:,:,k) = double(f(rsmat));
-               if nsh>0
-                    Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
+               
+                if me.gpuEnable
+                
+                    Frs(:,:,k) = f(rsmat);
+               
+                   if nsh>0
+%                         Frs(end+(1-nsh:0),1:nwin,k) = diag(tp)*Frs(end+(1-nsh:0),1:nwin,k);
+%                        Frs(1:nsh,1:nwin,k) = diag(invtaper)*Frs(1:nsh,1:nwin,k); 
+                        Frs(end+(1-nsh:0),1:nwin,k) = repmat(tp(:),1,nwin).*Frs(end+(1-nsh:0),1:nwin,k);
+                       Frs(1:nsh,1:nwin,k) = repmat(invtaper(:),1,nwin).*Frs(1:nsh,1:nwin,k); 
+                   end
 
-                   Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
-               end
+                else
+                
+                    Frs(:,:,k) = f(rsmat);
 
-                %%% Set all negative frequencies to zero
-%                     Frs(rsmat(:, end-1:end)>ceil((newn+1)/2),end,k)=0;
-%                     Frs(rsmat(:, 1:2)>ceil((newn+1)/2),1,k)=0;
-
-                %%% Corrections for DC and Nyquist to preserve power
-                %%% after zeroing negative frequencies
-%                 Frs(rsmat(:,1)==1,1,k)=Frs(rsmat(:,1)==1,1,k)/sqrt(2); 
-              %  Frs(dcindx + (k-1)*numel(rsmat))=Frs(dcindx + (k-1)*numel(rsmat))/sqrt(2); 
+                   if nsh>0
+%                         Frs(end+(1-nsh:0),1:nwin,k) = diag(sparse(tp))*Frs(end+(1-nsh:0),1:nwin,k);
+%                        Frs(1:nsh,1:nwin,k) = diag(sparse(invtaper))*Frs(1:nsh,1:nwin,k); 
+                        Frs(end+(1-nsh:0),1:nwin,k) = repmat(tp(:),1,nwin).*Frs(end+(1-nsh:0),1:nwin,k);
+                       Frs(1:nsh,1:nwin,k) = repmat(invtaper(:),1,nwin).*Frs(1:nsh,1:nwin,k); 
+                   end
+                end
 
            end
 
@@ -342,7 +392,7 @@ classdef dbt
                Frs = circshift(Frs,-ceil(winN/2*(1+me.shoulder)));  
            end
            
-            me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2)/sqrt(upratio);
+            me.blrep = ifft(Frs)*sqrt(padN)*sqrt(2)/sqrt(upratio-me.cospower+1);
                
             me.sampling_rate = padN/newT;
                  
@@ -389,19 +439,24 @@ classdef dbt
             
              upratio = me.upsampleFx+1;
            
+            if me.gpuEnable
+               gpuarg = {'gpuArray'};
+            else
+               gpuarg = {class(me.blrep)};
+           end
             if round(me.upsampleFx) ~= me.upsampleFx
                 error('\n%s does not currently allow signals to be reconstructed from a transform upsampled by a non-integer.',upper(mfilename))
             end
             if nargin < 2 || isempty(columnfilter)
-                mult = diag(sparse(ones(1,upratio)));
+                mult = diag(ones(1,upratio));
             elseif islogical(columnfilter)
-                mult = diag(sparse(columnfilter));
+                mult = diag(columnfilter);
             elseif min(size(columnfilter)) == 1 && min(columnfilter)>=1
                 
-               mult = diag(sparse( ismember(1:size(me.blrep,2),columnfilter)));
+               mult = diag( ismember(1:size(me.blrep,2),columnfilter));
                
             elseif min(size(columnfilter)) == 1
-                mult = diag(sparse(columnfilter));
+                mult = diag(columnfilter);
             else
                 mult = columnfilter;
             end
@@ -423,7 +478,7 @@ classdef dbt
 
            end
 
-            F = zeros(size(me.blrep,1),size(me.blrep,2)/upratio,ncol,upratio);
+            F = zeros(size(me.blrep,1),size(me.blrep,2)/upratio,ncol,upratio,gpuarg{:});
             for k = 1:ncol
                 for upsi = 1:upratio                 
                     F(:,:,k,upsi) = fft(me.blrep(:,upsi:upratio:end,k) )*mult(upsi:upratio:end,upsi:upratio:end)/sqrt(size(me.blrep,1)/2);         
@@ -443,8 +498,8 @@ classdef dbt
              nnyq = size(F,1);
             if nsh >0
                 % Taper is normally defined so that h(k).^2 + h(k+bw).^2 = 1
-                tp = me.taper.make((0:1:nsh-1)/nsh); 
-                invtaper = me.taper.make(1-(0:1:nsh-1)/nsh);
+                tp = me.taper.make((0:1:nsh-1)/nsh).^me.cospower; 
+                invtaper = me.taper.make(1-(0:1:nsh-1)/nsh).^me.cospower;
                 switch me.direction
                 %%% Approximate causal or anti-causal filters while
                 %%% preserving summation properties of the tapers.
@@ -465,8 +520,12 @@ classdef dbt
                
                 for k = 1:ncol
                     for upsi = 1:upratio
-                        sh = diag(sparse(invtaper))*F(1:nsh,2:end,k,upsi);                
-                        F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
+%                         sh = diag(sparse(invtaper))*F(1:nsh,2:end,k,upsi);                
+%                         F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(sparse(tp))*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
+%                           sh = diag(invtaper)*F(1:nsh,2:end,k,upsi);                
+                          sh = repmat(invtaper(:),1,size(F,2)-1).*F(1:nsh,2:end,k,upsi);                
+%                         F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = diag(tp)*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
+                        F(nnyq-nsh+1:nnyq,1:end-1,k,upsi) = repmat(tp(:),1,size(F,2)-1).*F(nnyq-nsh+1:nnyq,1:end-1,k,upsi)+sh;
                     end
                 end
                  
@@ -482,7 +541,7 @@ classdef dbt
 %             end
             
             F(1:nsh,:,:,:)=[];
-            Ffull = zeros(me.fullN,ncol);
+            Ffull = zeros(me.fullN,ncol,gpuarg{:});
             switch me.padding
                 case {'frequency','fft'}
                     warning('Frequency padding is an obsolete option.')
@@ -496,9 +555,11 @@ classdef dbt
                      nofs = round((me.bands(upsi,1) + me.bandwidth*me.shoulder)*T);
                      %%% Reconstruct signal, averaging over the oversampled
                      %%% bands.
-                     Ffull( 1 + mod(nofs + (1:numel(f))-1,me.fullN),k) =...
-                        Ffull( 1 + mod(nofs + (1:numel(f))-1,me.fullN),k)...
-                        + f(:) * sqrt(me.fullN)/sqrt(upratio);
+                    fillindx =  nofs + (1:numel(f))'-1;
+                    fillindx = 1+mod(fillindx(fillindx-fillindx(1)<me.fullN),me.fullN);
+                     Ffull(  fillindx,k) =...
+                        Ffull(  fillindx,k)...
+                        + f(true(size(fillindx))) * sqrt(me.fullN*me.cospower)/sqrt(upratio-me.cospower+1);
                end
                if ~mod(me.fullN,2)
                   Ffull(ceil(me.fullN/2+1),k) = Ffull(ceil(me.fullN/2+1),k)/2;
@@ -520,7 +581,7 @@ classdef dbt
             
         end
        %%%%
-        function varargout = specgram(me,normalize)
+        function varargout = specgram(me,normalize,varargin)
             if nargin < 2
                 normalize = 0;
             end
@@ -529,15 +590,26 @@ classdef dbt
             else
                 fun = @(x)x.blrep;
             end
-            S = 20*log10(abs(fun(me)))';
+            S = 20*log10(abs(fun(me)));
             t = me.time;
             w = me.frequency;
             if nargout == 0
-               imagesc(t,w,S) 
-               axis xy
+               if size(S,3)==1
+                 imagesc(t,w,S') 
+                 axis xy
+               else
+                 ax = nimagesc(permute(S,[2 1 3]),varargin{:});
+                 c = get(ax,'children');
+                 set([c{:}],'xdata',t,'ydata',w)
+                 axis(ax,'on')
+                 set(ax,'xlim',minmax(t),'ylim',minmax(w))
+               end
             else
                 varargout(1:3) = {S,t,w};
             end
+        end
+        function out = remodulator(me)
+                 out = exp(1i*2*pi*me.time*(me.frequency - (~me.centerDC)*me.bandwidth*(1+me.shoulder)/2));
         end
     end
 end

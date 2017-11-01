@@ -5,12 +5,8 @@ function [xout,spike] = spikefilter(xin,fs,spike)
 % are removed by first applying a z-score transform and rejecting all
 % outliers that exceed a given threshold magnitude (defualt is 10), then 
 % repeating the first step with remaining data points until no outliers 
-% remain beyond the threshold. Data are windowed by a function 
-%
-%        f = 10^( -A/20*( h(t) o I(t) ) )
-%
-% where I is the indicator for discarded times, and by default, h(t) is a .2 s
-% Hann window and A = 50.
+% remain beyond the threshold. Data are windowed by a function that convolves
+% a tapered log(1 - Hann + eps) window with the  
 %
 % Use: [xfilt,out] = spikefilter(x,fs,[options])
 %
@@ -19,26 +15,25 @@ function [xout,spike] = spikefilter(xin,fs,spike)
 %   x - A column vector with data
 %   fs - sampling frequency
 %   options  - A structure with the following fields: 
-%          .threshold  - z score threshold for spikes      
-%          .smoothwindow - duration of Hann window if scalar, otherwise the window function
-%          .interpolate - option to interpolate:
-%                           false: (default) simple windowing, no interpolation. The result output is then
-%                                       Xfiltered = X*f 
-%                           true: use a Hann window of twice the duration of the smoothing window to interpolate
-%                           [scalar value]: use a Hann window of the given duration to interpolate
-%                           [vector]: use the given window to interpolate
-%               Interpolation computes a moving weighted average, weighted by the window f to give Xinterp, 
-%               that is
-%                            Xinterp = ( g o (X*f) )/( g o f )  
-%               where g is the interpolation window, and the filtered result is  
-%                           Xfiltered = X*f + (1-f)*Xinterp
+%          .threshold  -       
+%
+%
+
+% ----------- SVN REVISION INFO ------------------
+% $URL$
+% $Revision$
+% $Date$
+% $Author$
+% ------------------------------------------------
 
 if nargin < 3
     spike.threshold = 10; % This is the threshold used in detecting spikes. 
                           % Z-score is computed iteratively until
-                          % no points exceed this value. 
-                          
-    spike.smoothwindow = .2;% Apply Hann window of given duration to smooth the spike filter.
+                          % no points exceed this value. The threshold is set
+                          % high by default because the main purpose here is to avoid
+                          % distortion of kurtosis used in the
+                          % kurtosis-threshold.
+    spike.smoothwindow = .2;% Apply hanning window of given duration to smooth the spike filter.
     
     spike.interpolate = false; % If true, interpolates values through a weighted average, 
                                % with a Hann interpolation window twice
@@ -56,7 +51,7 @@ if nargin < 3
    spike.combine_channels =false; % If true, combine the filter across channels and apply the same filter to all channels.                              
 end
 
-DB_attenuation = 50; %Peak attenuation for an isolated impulse
+DB_attenuation = 100; %Peak attenuation for an isolated impulse
 
 xout = zeros(size(xin));
 if size(xin,2)<2
