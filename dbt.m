@@ -24,11 +24,10 @@ classdef dbt
 %   .frequency: sampled center frequencies.
 %   .bands: band limits for each frequency band.
 %   .taper: taper used to window frequency bands.
-%   .padding: whether signal duration is adjusted through time padding
-%             ('time') or fequency padding ('frequency').
-%   .fftpad: degree of oversampling achieved through fft padding. 1
+%   .fftpad: degree of oversampling achieved through fft zero-padding. 1
 %            corresponds to 2x oversampling.
-%   .centerDC: If false (default), the fft of the DBT bands contains
+%   .upsampleFx: Amount by which to oversample the frequency dimension.
+%   .centerDC: If false, the fft of the DBT bands contains
 %               positive frequencies only, implying 2x oversampling,
 %               otherwise each band is demodulated to be centered on DC.
 %   .cospower: Power applied to the window (default = 1). Setting cospower=2
@@ -54,9 +53,14 @@ classdef dbt
 %      
 %       By default,  the taper is defined so that squares sum to 1
 %
-%  upsampleFx: upsample the frequency scale by a factor of (1+x) (default x
-%              = 0, no upsampling ).
-%
+%  upsampleFx - upsample frequency by a factor of (1+x) (default = 0, no upsampling ).
+%  upsampleTx - upsample time by a factor of (1+x) (default = 0, no upsampling ).
+%  upsample   - upsample both time and frequency by a factor of (1+x).
+%  bwtol - tolerance for error in setting the bandwidth. Higher values set the 
+%          bandwidth more precisely but may require more padding. Default=1e-8.
+%  remodphase - If true, remodulate each band back to its original center
+%               frequency. Default is false.
+%               
 % Methods:
 %
 % B.signal: Returns the signal reconstructed from DBT coefficients via the
@@ -73,7 +77,7 @@ classdef dbt
 %
 % See also TAPER, DBTCOH, DBTDENOISE, DBTPAC, STFT
 
-%     C Kovach 2013 - 2015
+%     C Kovach 2013 - 2017
 % 
 % ----------- SVN REVISION INFO ------------------
 % $URL$
@@ -98,7 +102,7 @@ classdef dbt
         shoulder = 1; % Degree of frequency overlap between neighboring bands (0 - 1)
         lowpass = []; % Lowpass cutoff
         taper = [];
-    	 fftpad = 0; % Upsample each band by padding its fft by this proportion of the unpadded length.
+    	fftpad = 0; % Upsample each band by padding its fft by this proportion of the unpadded length.
         upsampleFx = 0; %Amount by which to oversample the frequency dimension.
         userdata=[];
         centerDC = true; % If true, bands are demodulated to [-bandwidth bandwidth], otherwise to [0 bandwidth] with zero padding to 2*bandwidth.
@@ -115,7 +119,7 @@ classdef dbt
         direction = 'acausal'; % acausal (default),'causal', or 'anticausal'. Note these are only approximate as strictly causal or anticausal filters can have no zeros on the unit circle.                  
         remodphase = false; % If true, applies a phase correction equivalent to remodulating the subsampled data to the original band. This is necessary for example to get a
                             % correct average when averaging the raw spectrum over time.
-          padding = 'time'; % Options are 'time' or 'none'; 'frequency' is obsolete.
+        padding = 'time'; % Options are 'time' or 'none'; 'frequency' is obsolete.
         inputargs = {};
     end    
     
