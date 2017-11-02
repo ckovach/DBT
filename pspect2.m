@@ -2,9 +2,8 @@ function [out,pspindices] = pspect2(S,varargin)
 
 %[psp,pspindices] = pspect2({S1,S2,..,Sk},{f1,f2,...,fk},order,[options)
 %
-% General function for computing polyspectra of the given  order from an
-% input time x frequency matrix. This version allows a separate S to be 
-% specified for each term in the polyspectral product.
+% General function for computing polyspectra and cross polyspectra of the 
+% given  order from a cell array of time x frequency matrices.
 %
 % Input arguments:
 %       S:  1 x order cell array with matrices of time-frequency
@@ -23,7 +22,7 @@ function [out,pspindices] = pspect2(S,varargin)
 %   Avalailable options are:      
 %
 %   lowpass: limit the range of frequencies for each axis to values less-
-%           than or equal to this. This maybe specified as a scalar or as
+%           than or equal to this. This may be specified as a scalar or as
 %           a vector of order-1 length, which applies a separate limit for
 %           each dimension.
 %   highpass: limit to frequencies above this value, etc. 
@@ -59,7 +58,8 @@ options.lowpass= Inf;
 options.maxfreq= Inf;
 options.highpass= 0;
 options.normalization = 'awplv';
-options.full_range = true; % Add negative frequencies if they are not already included
+options.full_range = false; % Add negative frequencies if they are not already included
+options.min_range = false; % Return only one symmetry region
 options.symmetrize = false;
 options.round_freq = true; % Round to the nearest frequency band if necessary.
 options.tolerance = []; % Rounding tolerance (defaults to min(diff(f))).
@@ -119,6 +119,8 @@ while i <length(varargin)
     i = i+2;
 end
 
+options.full_range = options.full_range && ~options.min_range;
+
 if isscalar(options.lowpass)
     options.lowpass = options.lowpass*ones(1,order);
 end
@@ -153,7 +155,7 @@ for k =1:order
         S{k}=Sk;
     else
         resortindex{k} = 1:size(Sk,2); %#ok<*AGROW>
-        sconj{k} = false(size(resortindex));
+        sconj{k} = false(size(resortindex{k}));
     end
 end
 
@@ -161,25 +163,40 @@ W = fs(1:order-1);
 [W{:}] = ndgrid(fs{1:order-1});
 % W{order} = -sum(cat(order,W{:}),order);
 
-if ~options.symmetrize
-    WW = cellfun(@(x)x(:),W,'uniformoutput',false);
-else
+WW = cellfun(@(x)x(:),W,'uniformoutput',false);
+WW = [WW{:}];
+
+if options.symmetrize
     n1 = 1/(order-1);
-    WW = arrayfun(@(x,a)x{1}(:)-a*W{1}(:),W,n1*(1:order-1>1),'uniformoutput',false);
+    main_dim = 1;
+    other_dims = setdiff(1:order-1,main_dim);
+    WW(:,other_dims) = WW(:,other_dims)-n1*repmat(WW(:,main_dim),1,size(WW,2)-1);
 end
 
-WW = [WW{:}];
 WW(:,order) = -sum(WW,2);
+
 if axes_interchangeable
     WW = sort(WW,2);
 end
 
 % unique combinations only
 [wunq] = unique(WW,'rows');
-wunq(any(abs(wunq)>max(abs(f)),2) | abs(wunq(:,order))>options.maxfreq,:)=[];
+%wunq = WW(wunqi,:);
+mxf = cellfun(@(f)max(abs(f)),fs);
+wunq(any(abs(wunq)>repmat(mxf,size(wunq,1),1),2) | abs(wunq(:,order))>options.maxfreq,:)=[];
 [ism,indx] = ismember(WW,wunq,'rows');
-[cpart,cindx] = ismember(sort(-WW(~ism,:),2),wunq,'rows');
-indx(~ism)=cindx;
+% if options.min_range
+%     [unqindx,unqi]=unique(indx);
+%     indx(:)=0;
+%     indx(unqi)=unqindx;
+%     ism(:)=false;
+%     ism(unqi)=true;
+% end
+    
+if axes_interchangeable
+    [~,cindx] = ismember(sort(-WW(~ism,:),2),wunq,'rows');
+    indx(~ism)=cindx;
+end
 
 
 
@@ -219,9 +236,16 @@ end
 
 psp = sum(PS);
 psp(end+1)=0;
+
+if options.min_range
+    [uindx,uindxi] = unique(indx);
+    indx(:)=0;
+    indx(uindxi)=uindx;
+end
+
 indx(indx==0)=length(psp);
 
-
+    
 rmat = reshape(indx,size(W{1}));
 
 

@@ -23,6 +23,9 @@ function [out,pspindices] = pspect(S,varargin)
 %   highpass: limit to frequencies above this value, etc. 
 %   maxfreq: Sum of frequencies across all dimensions must be less-than-or
 %            -equal to this value.
+%   full_range: Add negative frequencies if they are not already included
+%
+%
 % Output arguments:
 %       psp: Struct with the following fields:
 %          .pspect: Unnormalized polyspectrum as an (order-1)-dimensional
@@ -55,6 +58,7 @@ options.full_range = true; % Add negative frequencies if they are not already in
 options.symmetrize = false;
 options.round_freq = true; % Round to the nearest frequency band if necessary.
 options.tolerance = []; % Rounding tolerance (defaults to min(diff(f))).
+options.principal_domain = false; %Only return values in the principal domain.
 options.getbias = true;
 %options.real_signal=true;
 
@@ -135,6 +139,11 @@ W = fs;
 [W{:}] = ndgrid(fs{:});
 % W{order} = -sum(cat(order,W{:}),order);
 
+principal_domain=true;
+for k = 2:length(W)
+    principal_domain = principal_domain & W{k-1}<=W{k};
+end
+
 if ~options.symmetrize
     WW = cellfun(@(x)x(:),W,'uniformoutput',false);
 else
@@ -147,7 +156,12 @@ WW(:,order) = -sum(WW,2);
 WW = sort(WW,2);
 
 % unique combinations only
-[wunq] = unique(WW,'rows');
+if options.principal_domain
+    [wunq] = unique(WW(principal_domain(:),:),'rows');
+else
+       [wunq] = unique(WW,'rows');
+end
+   
 wunq(any(abs(wunq)>max(abs(f)),2) | abs(wunq(:,order))>options.maxfreq,:)=[];
 [ism,indx] = ismember(WW,wunq,'rows');
 [cpart,cindx] = ismember(sort(-WW(~ism,:),2),wunq,'rows');
@@ -155,7 +169,7 @@ indx(~ism)=cindx;
 
 [fism,findx] = ismember(round(wunq./options.tolerance),round(f./options.tolerance));
 
-[~,findx(~fism)] = ismember(-wunq(~fism),f);
+[~,findx(~fism)] = ismember(round(-wunq(~fism)./options.tolerance),round(f./options.tolerance));
 
 PS = 1;
 NORM = 1;
@@ -188,7 +202,9 @@ end
 psp = sum(PS);
 psp(end+1)=0;
 indx(indx==0)=length(psp);
-
+if options.principal_domain
+   indx(~principal_domain(:))=length(psp); 
+end
 
 rmat = reshape(indx,size(W{1}));
 
@@ -228,5 +244,9 @@ if nargout >1
     pspindices.findex = resortindex(findx);
     pspindices.conjugate = xor(fism,sconj(findx));
     pspindices.reconmat = rmat;
+    
+    
+    pspindices.principal_domain=principal_domain;
+    
 end
 
