@@ -17,7 +17,7 @@ classdef dbt
 %
 %  B.blrep: time-frequency coefficients with rows corresponding to time
 %           and columns to frequency. If X is a matrix, channels correspond to the
-%           3rd dimension.help 
+%           3rd dimension. 
 %   .bandwidth:  bandwidth of the DBT.
 %   .sampling_rate: sampling rate after the transform.
 %   .time:  sampled time points.
