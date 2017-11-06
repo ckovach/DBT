@@ -277,6 +277,12 @@ end
 
 out.options = options;
 
+[unq,unqi] = unique(rmat(:));
+lin(unq) = unqi;
+out.lin = lin(:);
+out.square = rmat;
+
+
 if nargout >1
     if axes_interchangeable
         pspindices.findex = resortindex{1}(findxs);
