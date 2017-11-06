@@ -54,7 +54,7 @@ options.lowpass= Inf;
 options.maxfreq= Inf;
 options.highpass= 0;
 options.normalization = 'awplv';
-options.full_range = true; % Add negative frequencies if they are not already included
+options.full_range = false; % Add negative frequencies if they are not already included
 options.symmetrize = false;
 options.round_freq = true; % Round to the nearest frequency band if necessary.
 options.tolerance = []; % Rounding tolerance (defaults to min(diff(f))).
@@ -238,7 +238,13 @@ switch options.normalization
   
 end
 
-out.options = options;tic
+out.options = options;
+
+[unq,unqi] = unique(rmat(:));
+lin(unq) = unqi;
+out.lin = lin(:);
+out.square = rmat;
+
 
 if nargout >1
     pspindices.findex = resortindex(findx);
