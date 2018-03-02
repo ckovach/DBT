@@ -6,7 +6,8 @@ function [xout,spike] = spikefilter(xin,fs,spike)
 % outliers that exceed a given threshold magnitude (defualt is 10), then 
 % repeating the first step with remaining data points until no outliers 
 % remain beyond the threshold. Data are windowed by a function that convolves
-% a tapered log(1 - Hann + eps) window with the  
+% a tapered a window given by 10.^(-atten/20*hann(n)), where 'atten' determines the peak
+% attenuation, with a train of impulses corresponding to the rejected time points. 
 %
 % Use: [xfilt,out] = spikefilter(x,fs,[options])
 %
@@ -14,8 +15,8 @@ function [xout,spike] = spikefilter(xin,fs,spike)
 %
 %   x - A column vector with data
 %   fs - sampling frequency
-%   options  - A structure with the following fields: 
-%          .threshold  -       
+%   options  - A structure with the options.  See the documentation below
+%             for details.
 %
 %
 
